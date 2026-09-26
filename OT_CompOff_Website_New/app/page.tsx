@@ -18,7 +18,7 @@ type Entry = {
   ot_hours: number;
   reason: string | null;
   comp_off_date: string | null;
-  comp_off_status: string;
+  comp_off_status: string | null;
 };
 
 const supabase = createClient(
@@ -37,8 +37,7 @@ export default function Home() {
     ot_date: '',
     start_time: '',
     end_time: '',
-    reason: '',
-    comp_off_date: ''
+    reason: ''
   });
 
   useEffect(() => {
@@ -130,7 +129,7 @@ export default function Home() {
     }
 
     if (data) {
-      setEntries(data);
+      setEntries(data as Entry[]);
     }
   }
 
@@ -188,10 +187,8 @@ export default function Home() {
         end_time: form.end_time,
         ot_hours: otHours,
         reason: form.reason || null,
-        comp_off_date: form.comp_off_date || null,
-        comp_off_status: form.comp_off_date
-          ? 'available'
-          : 'not_set'
+        comp_off_date: null,
+        comp_off_status: null
       });
 
     if (error) {
@@ -203,8 +200,7 @@ export default function Home() {
         ot_date: '',
         start_time: '',
         end_time: '',
-        reason: '',
-        comp_off_date: ''
+        reason: ''
       });
 
       await loadEntries(staff.id);
@@ -213,13 +209,13 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function useCompOff(id: number) {
+  async function takeCompOff(id: number) {
     if (!staff) {
       return;
     }
 
     const date = prompt(
-      'Comp-Off use date (YYYY-MM-DD):'
+      'Comp-Off date enter karo (YYYY-MM-DD):'
     );
 
     if (!date) {
@@ -229,19 +225,20 @@ export default function Home() {
     const { error } = await supabase
       .from('ot_entries')
       .update({
-        comp_off_status: 'used',
-        comp_off_date: date
+        comp_off_date: date,
+        comp_off_status: 'Comp-Off Used'
       })
       .eq('id', id)
       .eq('staff_id', staff.id)
-      .eq('comp_off_status', 'available');
+      .is('comp_off_date', null);
 
     if (error) {
       setMessage(error.message);
-    } else {
-      setMessage('Comp-Off marked Used.');
-      await loadEntries(staff.id);
+      return;
     }
+
+    setMessage('Comp-Off saved.');
+    await loadEntries(staff.id);
   }
 
   function logout() {
@@ -412,23 +409,6 @@ export default function Home() {
             />
           </div>
 
-          <div>
-            <label>
-              Comp-Off Date
-            </label>
-
-            <input
-              type="date"
-              value={form.comp_off_date}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  comp_off_date: e.target.value
-                })
-              }
-            />
-          </div>
-
           <div className="wide">
             <label>
               Reason
@@ -495,7 +475,7 @@ export default function Home() {
                 <th>Time</th>
                 <th>Hours</th>
                 <th>Reason</th>
-                <th>Comp-Off</th>
+                <th>Comp-Off Date</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -526,33 +506,25 @@ export default function Home() {
                   </td>
 
                   <td>
-                    {entry.comp_off_date || '-'}
+                    {entry.comp_off_date || ''}
                   </td>
 
                   <td>
-                    <span
-                      className={
-                        'status ' +
-                        entry.comp_off_status
-                      }
-                    >
-                      {entry.comp_off_status}
-                    </span>
+                    {entry.comp_off_status || ''}
                   </td>
 
                   <td>
-                    {entry.comp_off_status ===
-                    'available' ? (
+                    {!entry.comp_off_date ? (
                       <button
                         className="small"
                         onClick={() =>
-                          useCompOff(entry.id)
+                          takeCompOff(entry.id)
                         }
                       >
                         Comp-Off
                       </button>
                     ) : (
-                      '—'
+                      ''
                     )}
                   </td>
 
