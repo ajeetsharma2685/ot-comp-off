@@ -19,7 +19,9 @@ type OTEntry = {
   start_time?: string;
   end_time?: string;
   ot_hours?: number;
+  ot_reason?: string;
   comp_off?: boolean;
+  comp_off_date?: string;
   status?: string;
 };
 
@@ -68,8 +70,6 @@ button {
     radial-gradient(circle at top right, rgba(37,99,235,.08), transparent 28%),
     #f5f7fb;
 }
-
-/* LOGIN */
 
 .login-page {
   min-height: 100vh;
@@ -303,8 +303,6 @@ button {
   border: 1px solid #ffd9d6;
 }
 
-/* APP */
-
 .app-layout {
   min-height: 100vh;
   display: flex;
@@ -499,8 +497,6 @@ button {
   font-size: 14px;
 }
 
-/* STATS */
-
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -546,8 +542,6 @@ button {
   font-size: 27px;
   font-weight: 800;
 }
-
-/* FEATURE */
 
 .section-title {
   font-size: 16px;
@@ -602,8 +596,6 @@ button {
   font-size: 12px;
   line-height: 1.5;
 }
-
-/* PANELS */
 
 .panel {
   background: white;
@@ -663,7 +655,7 @@ button {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 650px;
+  min-width: 900px;
 }
 
 .data-table th {
@@ -705,6 +697,27 @@ button {
   color: #667085;
 }
 
+.comp-off-btn {
+  height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #1455b8;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.comp-off-btn:hover {
+  background: #10499f;
+}
+
+.comp-off-date {
+  color: #1754b6;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -737,7 +750,37 @@ button {
   gap: 20px;
 }
 
-/* MOBILE */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  border-radius: 18px;
+  padding: 25px;
+  box-shadow: 0 25px 70px rgba(15,23,42,.25);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.modal-actions .secondary-btn,
+.modal-actions .action-btn {
+  flex: 1;
+  margin-top: 0;
+}
 
 @media (max-width: 900px) {
   .login-wrapper {
@@ -1025,6 +1068,17 @@ export default function Home() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  /* COMP-OFF */
+
+  const [compOffRow, setCompOffRow] =
+    useState<OTEntry | null>(null);
+
+  const [compOffDate, setCompOffDate] =
+    useState('');
+
+  const [savingCompOff, setSavingCompOff] =
+    useState(false);
+
   useEffect(() => {
     try {
       const saved =
@@ -1109,13 +1163,6 @@ export default function Home() {
         setPassword('');
         setPage('dashboard');
       } else {
-        /*
-          STAFF LOGIN
-          Employee ID only.
-          Uses SECURITY DEFINER RPC so RLS
-          does not block authorized staff.
-        */
-
         const { data, error } =
           await adminRPC('staff_login', {
             p_employee_id: employeeId.trim(),
@@ -1220,6 +1267,64 @@ export default function Home() {
     }
   }
 
+  /* SAVE COMP-OFF */
+
+  async function saveCompOff() {
+    setMessage('');
+
+    if (!compOffRow?.id) {
+      setMessage('OT record ID not found');
+      return;
+    }
+
+    if (!compOffDate) {
+      setMessage('Please select Comp-Off date');
+      return;
+    }
+
+    setSavingCompOff(true);
+
+    try {
+      const { data, error } =
+        await adminRPC(
+          'admin_set_comp_off',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+
+            p_ot_id: compOffRow.id,
+
+            p_comp_off_date:
+              compOffDate,
+          }
+        );
+
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      if (!data?.success) {
+        setMessage(
+          data?.message ||
+            'Unable to save Comp-Off'
+        );
+        return;
+      }
+
+      setCompOffRow(null);
+      setCompOffDate('');
+
+      setMessage(
+        'Comp-Off date saved successfully'
+      );
+
+      await loadOT();
+    } finally {
+      setSavingCompOff(false);
+    }
+  }
+
   /* ADD EMPLOYEE */
 
   async function addEmployee() {
@@ -1269,11 +1374,6 @@ export default function Home() {
       setNewEmployeeId('');
       setNewEmployeeName('');
 
-      /*
-        Refresh staff list.
-        New/re-activated employee is expected
-        to have access_enabled = true.
-      */
       await loadStaff();
     } finally {
       setLoading(false);
@@ -1635,8 +1735,9 @@ export default function Home() {
       'Start Time',
       'End Time',
       'OT Hours',
-      'Comp Off',
+      'OT Reason',
       'Status',
+      'Comp-Off Date',
     ];
 
     const rows = filteredOT.map((r) => [
@@ -1646,8 +1747,11 @@ export default function Home() {
       r.start_time || '',
       r.end_time || '',
       r.ot_hours || '',
-      r.comp_off ? 'Yes' : 'No',
-      r.status || '',
+      r.ot_reason || '',
+      r.comp_off_date
+        ? 'Comp-Off Taken'
+        : '',
+      r.comp_off_date || '',
     ]);
 
     const csv = [
@@ -2618,13 +2722,37 @@ export default function Home() {
                           <th>
                             Employee ID
                           </th>
-                          <th>Name</th>
-                          <th>Date</th>
-                          <th>Start</th>
-                          <th>End</th>
-                          <th>Hours</th>
+
                           <th>
-                            Comp Off
+                            Name
+                          </th>
+
+                          <th>
+                            Date
+                          </th>
+
+                          <th>
+                            Start
+                          </th>
+
+                          <th>
+                            End
+                          </th>
+
+                          <th>
+                            Hours
+                          </th>
+
+                          <th>
+                            OT Reason
+                          </th>
+
+                          <th>
+                            Status
+                          </th>
+
+                          <th>
+                            Comp-Off
                           </th>
                         </tr>
                       </thead>
@@ -2638,6 +2766,7 @@ export default function Home() {
                                 r.id || i
                               }
                             >
+
                               <td>
                                 {r.employee_id ||
                                   '-'}
@@ -2673,10 +2802,53 @@ export default function Home() {
                               </td>
 
                               <td>
-                                {r.comp_off
-                                  ? 'Yes'
-                                  : 'No'}
+                                {r.ot_reason ||
+                                  '-'}
                               </td>
+
+                              <td>
+                                {r.comp_off_date ? (
+                                  <span className="badge badge-active">
+                                    Comp-Off Taken
+                                  </span>
+                                ) : (
+                                  ''
+                                )}
+                              </td>
+
+                              <td>
+
+                                {r.comp_off_date ? (
+
+                                  <span className="comp-off-date">
+                                    {r.comp_off_date}
+                                  </span>
+
+                                ) : (
+
+                                  <button
+                                    className="comp-off-btn"
+                                    onClick={() => {
+                                      setCompOffRow(
+                                        r
+                                      );
+
+                                      setCompOffDate(
+                                        ''
+                                      );
+
+                                      setMessage(
+                                        ''
+                                      );
+                                    }}
+                                  >
+                                    Comp-Off
+                                  </button>
+
+                                )}
+
+                              </td>
+
                             </tr>
                           )
                         )}
@@ -2684,7 +2856,7 @@ export default function Home() {
                         {!filteredOT.length && (
                           <tr>
                             <td
-                              colSpan={7}
+                              colSpan={9}
                               style={{
                                 textAlign:
                                   'center',
@@ -2710,8 +2882,6 @@ export default function Home() {
 
               {page === 'admin' && (
                 <div className="two-panel">
-
-                  {/* MAKE ADMIN */}
 
                   <div className="panel">
 
@@ -2817,8 +2987,6 @@ export default function Home() {
 
                   </div>
 
-                  {/* REMOVE STAFF */}
-
                   <div className="panel">
 
                     <div className="panel-header">
@@ -2891,8 +3059,6 @@ export default function Home() {
 
                   </div>
 
-                  {/* ADMIN ACCOUNTS */}
-
                   <div className="panel">
 
                     <div className="panel-header">
@@ -2949,8 +3115,6 @@ export default function Home() {
                     </button>
 
                   </div>
-
-                  {/* RESET ADMIN PASSWORD */}
 
                   <div className="panel">
 
@@ -3150,6 +3314,82 @@ export default function Home() {
 
         </div>
       </div>
+
+      {/* COMP-OFF MODAL */}
+
+      {compOffRow && (
+        <div className="modal-overlay">
+
+          <div className="modal-box">
+
+            <div className="panel-header">
+
+              <div>
+                <div className="panel-title">
+                  Add Comp-Off
+                </div>
+
+                <div className="helper">
+                  {compOffRow.employee_id || '-'}
+                  {' - '}
+                  {compOffRow.name || '-'}
+                </div>
+              </div>
+
+            </div>
+
+            <div className="form-group">
+
+              <label className="form-label">
+                Comp-Off Date
+              </label>
+
+              <input
+                className="form-input"
+                type="date"
+                value={compOffDate}
+                onChange={(e) =>
+                  setCompOffDate(
+                    e.target.value
+                  )
+                }
+              />
+
+            </div>
+
+            <div className="modal-actions">
+
+              <button
+                className="secondary-btn"
+                onClick={() => {
+                  setCompOffRow(null);
+                  setCompOffDate('');
+                }}
+                disabled={savingCompOff}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="action-btn"
+                onClick={saveCompOff}
+                disabled={
+                  savingCompOff ||
+                  !compOffDate
+                }
+              >
+                {savingCompOff
+                  ? 'Saving...'
+                  : 'Save Comp-Off'}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
     </>
   );
 }
