@@ -65,6 +65,10 @@ export default function Home() {
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
 
+  const [editingStaffId, setEditingStaffId] = useState<number | null>(null);
+  const [editingEmployeeId, setEditingEmployeeId] = useState('');
+  const [editingName, setEditingName] = useState('');
+
   const [form, setForm] = useState({
     ot_date: '',
     start_time: '',
@@ -452,6 +456,79 @@ export default function Home() {
     }
   }
 
+  function startEdit(employee: AdminStaff) {
+    setEditingStaffId(employee.id);
+    setEditingEmployeeId(employee.employee_id);
+    setEditingName(employee.name);
+    setMessage('');
+  }
+
+  function cancelEdit() {
+    setEditingStaffId(null);
+    setEditingEmployeeId('');
+    setEditingName('');
+  }
+
+  async function saveEdit() {
+    if (!staff || staff.role !== 'admin') {
+      return;
+    }
+
+    if (!editingStaffId) {
+      return;
+    }
+
+    if (!editingEmployeeId.trim()) {
+      setMessage('Employee ID required hai.');
+      return;
+    }
+
+    if (!editingName.trim()) {
+      setMessage('Employee Name required hai.');
+      return;
+    }
+
+    setAdminLoading(true);
+    setMessage('');
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'admin_update_staff',
+        {
+          p_admin_employee_id: staff.employee_id,
+          p_staff_id: editingStaffId,
+          p_employee_id: editingEmployeeId.trim(),
+          p_name: editingName.trim()
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success === false) {
+        throw new Error(
+          data?.message || 'Employee details update nahi hue.'
+        );
+      }
+
+      setEditingStaffId(null);
+      setEditingEmployeeId('');
+      setEditingName('');
+
+      setMessage('Employee details updated successfully.');
+
+      await loadAdminData();
+    } catch (error: any) {
+      setMessage(
+        error.message ||
+          'Employee details update nahi hue.'
+      );
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
   async function toggleEmployee(
     staffId: number,
     enabled: boolean
@@ -519,9 +596,10 @@ export default function Home() {
     ];
 
     const escapeCSV = (value: any) => {
-      const text = value === null || value === undefined
-        ? ''
-        : String(value);
+      const text =
+        value === null || value === undefined
+          ? ''
+          : String(value);
 
       return `"${text.replace(/"/g, '""')}"`;
     };
@@ -771,6 +849,7 @@ export default function Home() {
         <section className="welcome">
 
           <div>
+
             <p className="muted">
               Welcome Admin
             </p>
@@ -782,9 +861,11 @@ export default function Home() {
             <span className="pill">
               {staff.employee_id}
             </span>
+
           </div>
 
           <div className="stat">
+
             <span>
               Total OT
             </span>
@@ -792,6 +873,7 @@ export default function Home() {
             <b>
               {adminTotalOT.toFixed(2)} hrs
             </b>
+
           </div>
 
         </section>
@@ -817,6 +899,7 @@ export default function Home() {
           <div className="grid">
 
             <div>
+
               <label>
                 Employee ID
               </label>
@@ -828,9 +911,11 @@ export default function Home() {
                 }
                 placeholder="Enter Employee ID"
               />
+
             </div>
 
             <div>
+
               <label>
                 Employee Name
               </label>
@@ -842,6 +927,7 @@ export default function Home() {
                 }
                 placeholder="Enter Employee Name"
               />
+
             </div>
 
           </div>
@@ -861,13 +947,17 @@ export default function Home() {
 
           <div className="sectionHead">
 
-            <h3>
-              Employee List
-            </h3>
+            <div>
 
-            <span className="muted">
-              {adminStaff.length} employees
-            </span>
+              <h3>
+                Staff Details
+              </h3>
+
+              <span className="muted">
+                {adminStaff.length} employees
+              </span>
+
+            </div>
 
           </div>
 
@@ -893,49 +983,147 @@ export default function Home() {
 
                   <tr key={employee.id}>
 
-                    <td>
-                      {employee.employee_id}
-                    </td>
+                    {editingStaffId === employee.id ? (
 
-                    <td>
-                      {employee.name}
-                    </td>
+                      <>
+                        <td>
 
-                    <td>
-                      {employee.role}
-                    </td>
+                          <input
+                            value={editingEmployeeId}
+                            onChange={(e) =>
+                              setEditingEmployeeId(
+                                e.target.value
+                              )
+                            }
+                          />
 
-                    <td>
-                      {employee.access_enabled
-                        ? 'Active'
-                        : 'Disabled'}
-                    </td>
+                        </td>
 
-                    <td>
+                        <td>
 
-                      {employee.employee_id ===
-                      staff.employee_id ? (
-                        <span className="pill">
-                          Admin
-                        </span>
-                      ) : (
-                        <button
-                          className="small"
-                          onClick={() =>
-                            toggleEmployee(
-                              employee.id,
-                              !employee.access_enabled
-                            )
-                          }
-                          disabled={adminLoading}
-                        >
+                          <input
+                            value={editingName}
+                            onChange={(e) =>
+                              setEditingName(
+                                e.target.value
+                              )
+                            }
+                          />
+
+                        </td>
+
+                        <td>
+                          {employee.role}
+                        </td>
+
+                        <td>
                           {employee.access_enabled
-                            ? 'Disable'
-                            : 'Enable'}
-                        </button>
-                      )}
+                            ? 'Active'
+                            : 'Disabled'}
+                        </td>
 
-                    </td>
+                        <td>
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              flexWrap: 'wrap'
+                            }}
+                          >
+
+                            <button
+                              className="small"
+                              onClick={saveEdit}
+                              disabled={adminLoading}
+                            >
+                              Save
+                            </button>
+
+                            <button
+                              className="small secondary"
+                              onClick={cancelEdit}
+                              disabled={adminLoading}
+                            >
+                              Cancel
+                            </button>
+
+                          </div>
+
+                        </td>
+                      </>
+
+                    ) : (
+
+                      <>
+                        <td>
+                          {employee.employee_id}
+                        </td>
+
+                        <td>
+                          {employee.name}
+                        </td>
+
+                        <td>
+                          {employee.role}
+                        </td>
+
+                        <td>
+                          {employee.access_enabled
+                            ? 'Active'
+                            : 'Disabled'}
+                        </td>
+
+                        <td>
+
+                          {employee.role === 'admin' ? (
+
+                            <span className="pill">
+                              Admin
+                            </span>
+
+                          ) : (
+
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '6px',
+                                flexWrap: 'wrap'
+                              }}
+                            >
+
+                              <button
+                                className="small"
+                                onClick={() =>
+                                  startEdit(employee)
+                                }
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="small"
+                                onClick={() =>
+                                  toggleEmployee(
+                                    employee.id,
+                                    !employee.access_enabled
+                                  )
+                                }
+                                disabled={adminLoading}
+                              >
+                                {employee.access_enabled
+                                  ? 'Disable'
+                                  : 'Enable'}
+                              </button>
+
+                            </div>
+
+                          )}
+
+                        </td>
+                      </>
+
+                    )}
 
                   </tr>
 
@@ -967,6 +1155,7 @@ export default function Home() {
           <div className="sectionHead">
 
             <div>
+
               <h3>
                 All Staff OT Records
               </h3>
@@ -974,6 +1163,7 @@ export default function Home() {
               <span className="muted">
                 {adminOT.length} OT entries
               </span>
+
             </div>
 
             <button
@@ -1309,21 +1499,18 @@ export default function Home() {
                   </td>
 
                   <td>
-                    {entry.comp_off_date
-                      ? entry.comp_off_date
-                      : ''}
+                    {entry.comp_off_date || ''}
                   </td>
 
                   <td>
-                    {entry.comp_off_status
-                      ? entry.comp_off_status
-                      : ''}
+                    {entry.comp_off_status || ''}
                   </td>
 
                   <td>
 
                     {!entry.comp_off_date &&
                     compOffEntryId !== entry.id && (
+
                       <button
                         className="small"
                         onClick={() =>
@@ -1332,9 +1519,11 @@ export default function Home() {
                       >
                         Comp-Off
                       </button>
+
                     )}
 
                     {compOffEntryId === entry.id && (
+
                       <div
                         style={{
                           display: 'flex',
@@ -1374,6 +1563,7 @@ export default function Home() {
                         </button>
 
                       </div>
+
                     )}
 
                   </td>
