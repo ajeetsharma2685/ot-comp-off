@@ -40,6 +40,9 @@ export default function Home() {
     reason: ''
   });
 
+  const [compOffEntryId, setCompOffEntryId] = useState<number | null>(null);
+  const [compOffDate, setCompOffDate] = useState('');
+
   useEffect(() => {
     const savedStaff = localStorage.getItem('ot_staff');
 
@@ -209,36 +212,52 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function takeCompOff(id: number) {
-    if (!staff) {
+  function openCompOff(entryId: number) {
+    setCompOffEntryId(entryId);
+    setCompOffDate('');
+    setMessage('');
+  }
+
+  function cancelCompOff() {
+    setCompOffEntryId(null);
+    setCompOffDate('');
+  }
+
+  async function confirmCompOff() {
+    if (!staff || !compOffEntryId) {
       return;
     }
 
-    const date = prompt(
-      'Comp-Off date enter karo (YYYY-MM-DD):'
-    );
-
-    if (!date) {
+    if (!compOffDate) {
+      setMessage('Please select Comp-Off date.');
       return;
     }
+
+    setLoading(true);
+    setMessage('');
 
     const { error } = await supabase
       .from('ot_entries')
       .update({
-        comp_off_date: date,
+        comp_off_date: compOffDate,
         comp_off_status: 'Comp-Off Used'
       })
-      .eq('id', id)
+      .eq('id', compOffEntryId)
       .eq('staff_id', staff.id)
       .is('comp_off_date', null);
 
     if (error) {
       setMessage(error.message);
-      return;
+    } else {
+      setMessage('Comp-Off Used successfully.');
+
+      setCompOffEntryId(null);
+      setCompOffDate('');
+
+      await loadEntries(staff.id);
     }
 
-    setMessage('Comp-Off saved.');
-    await loadEntries(staff.id);
+    setLoading(false);
   }
 
   function logout() {
@@ -261,9 +280,14 @@ export default function Home() {
     return (
       <main className="center">
         <section className="card login">
-          <div className="logo">OT</div>
 
-          <h1>OT & Comp-Off</h1>
+          <div className="logo">
+            OT
+          </div>
+
+          <h1>
+            OT & Comp-Off
+          </h1>
 
           <p className="muted">
             Staff Login
@@ -302,6 +326,7 @@ export default function Home() {
           <small>
             No OTP / password required.
           </small>
+
         </section>
       </main>
     );
@@ -311,9 +336,15 @@ export default function Home() {
     <main className="page">
 
       <header className="topbar">
+
         <div>
-          <b>OT & Comp-Off</b>
-          <span> Staff Portal</span>
+          <b>
+            OT & Comp-Off
+          </b>
+
+          <span>
+            {' '}Staff Portal
+          </span>
         </div>
 
         <button
@@ -322,10 +353,13 @@ export default function Home() {
         >
           Logout
         </button>
+
       </header>
 
       <section className="welcome">
+
         <div>
+
           <p className="muted">
             Welcome
           </p>
@@ -337,9 +371,11 @@ export default function Home() {
           <span className="pill">
             {staff.employee_id}
           </span>
+
         </div>
 
         <div className="stat">
+
           <span>
             Total OT
           </span>
@@ -347,7 +383,9 @@ export default function Home() {
           <b>
             {total.toFixed(2)} hrs
           </b>
+
         </div>
+
       </section>
 
       <section className="card">
@@ -359,6 +397,7 @@ export default function Home() {
         <div className="grid">
 
           <div>
+
             <label>
               OT Date
             </label>
@@ -373,9 +412,11 @@ export default function Home() {
                 })
               }
             />
+
           </div>
 
           <div>
+
             <label>
               Start Time
             </label>
@@ -390,9 +431,11 @@ export default function Home() {
                 })
               }
             />
+
           </div>
 
           <div>
+
             <label>
               End Time
             </label>
@@ -407,9 +450,11 @@ export default function Home() {
                 })
               }
             />
+
           </div>
 
           <div className="wide">
+
             <label>
               Reason
             </label>
@@ -424,18 +469,22 @@ export default function Home() {
               }
               placeholder="Reason for OT"
             />
+
           </div>
 
         </div>
 
         <div className="preview">
+
           Calculated OT:{' '}
+
           <b>
             {calculateHours(
               form.start_time,
               form.end_time
             ).toFixed(2)} hours
           </b>
+
         </div>
 
         <button
@@ -456,6 +505,7 @@ export default function Home() {
       <section className="card">
 
         <div className="sectionHead">
+
           <h3>
             My OT Records
           </h3>
@@ -463,6 +513,7 @@ export default function Home() {
           <span className="muted">
             {entries.length} records
           </span>
+
         </div>
 
         <div className="tableWrap">
@@ -470,6 +521,7 @@ export default function Home() {
           <table>
 
             <thead>
+
               <tr>
                 <th>Date</th>
                 <th>Time</th>
@@ -479,11 +531,13 @@ export default function Home() {
                 <th>Status</th>
                 <th>Action</th>
               </tr>
+
             </thead>
 
             <tbody>
 
               {entries.map((entry) => (
+
                 <tr key={entry.id}>
 
                   <td>
@@ -506,33 +560,87 @@ export default function Home() {
                   </td>
 
                   <td>
-                    {entry.comp_off_date || ''}
+
+                    {entry.comp_off_date
+                      ? entry.comp_off_date
+                      : ''}
+
                   </td>
 
                   <td>
-                    {entry.comp_off_status || ''}
+
+                    {entry.comp_off_status
+                      ? entry.comp_off_status
+                      : ''}
+
                   </td>
 
                   <td>
-                    {!entry.comp_off_date ? (
+
+                    {!entry.comp_off_date &&
+                    compOffEntryId !== entry.id && (
                       <button
                         className="small"
                         onClick={() =>
-                          takeCompOff(entry.id)
+                          openCompOff(entry.id)
                         }
                       >
                         Comp-Off
                       </button>
-                    ) : (
-                      ''
                     )}
+
+                    {compOffEntryId === entry.id && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '6px',
+                          alignItems: 'center',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+
+                        <input
+                          type="date"
+                          value={compOffDate}
+                          onChange={(e) =>
+                            setCompOffDate(
+                              e.target.value
+                            )
+                          }
+                        />
+
+                        <button
+                          className="small"
+                          onClick={confirmCompOff}
+                          disabled={
+                            loading ||
+                            !compOffDate
+                          }
+                        >
+                          Confirm
+                        </button>
+
+                        <button
+                          className="small secondary"
+                          onClick={cancelCompOff}
+                          disabled={loading}
+                        >
+                          Cancel
+                        </button>
+
+                      </div>
+                    )}
+
                   </td>
 
                 </tr>
+
               ))}
 
               {entries.length === 0 && (
+
                 <tr>
+
                   <td
                     colSpan={7}
                     style={{
@@ -541,7 +649,9 @@ export default function Home() {
                   >
                     No OT records found.
                   </td>
+
                 </tr>
+
               )}
 
             </tbody>
