@@ -8,10 +8,32 @@ type Staff = {
   employee_id: string;
   name: string;
   access_enabled: boolean;
+  role: string;
 };
 
 type Entry = {
   id: number;
+  ot_date: string;
+  start_time: string;
+  end_time: string;
+  ot_hours: number;
+  reason: string | null;
+  comp_off_date: string | null;
+  comp_off_status: string | null;
+};
+
+type AdminStaff = {
+  id: number;
+  employee_id: string;
+  name: string;
+  access_enabled: boolean;
+  role: string;
+};
+
+type AdminOT = {
+  id: number;
+  employee_id: string;
+  name: string;
   ot_date: string;
   start_time: string;
   end_time: string;
@@ -32,6 +54,16 @@ export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  const [adminLoginMode, setAdminLoginMode] = useState(false);
+  const [adminEmployeeId, setAdminEmployeeId] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+
+  const [adminStaff, setAdminStaff] = useState<AdminStaff[]>([]);
+  const [adminOT, setAdminOT] = useState<AdminOT[]>([]);
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
 
   const [form, setForm] = useState({
     ot_date: '',
@@ -58,8 +90,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (staff) {
+    if (staff && staff.role !== 'admin') {
       loadEntries(staff.id);
+    }
+
+    if (staff?.role === 'admin') {
+      loadAdminData();
     }
   }, [staff]);
 
@@ -102,7 +138,8 @@ export default function Home() {
         id: data.staff_id,
         employee_id: data.employee_id,
         name: data.name,
-        access_enabled: true
+        access_enabled: true,
+        role: data.role
       };
 
       localStorage.setItem(
@@ -114,6 +151,63 @@ export default function Home() {
       setMessage('Login successful.');
     } catch (error: any) {
       setMessage(error.message || 'Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function adminLogin() {
+    setMessage('');
+
+    if (!adminEmployeeId.trim()) {
+      setMessage('Admin Employee ID enter karo.');
+      return;
+    }
+
+    if (!adminPassword) {
+      setMessage('Admin Password enter karo.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await ensureAnonymous();
+
+      const { data, error } = await supabase.rpc('admin_login', {
+        p_employee_id: adminEmployeeId.trim(),
+        p_password: adminPassword
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(
+          data?.message || 'Admin login failed.'
+        );
+      }
+
+      const loggedInAdmin: Staff = {
+        id: data.staff_id,
+        employee_id: data.employee_id,
+        name: data.name,
+        access_enabled: true,
+        role: data.role
+      };
+
+      localStorage.setItem(
+        'ot_staff',
+        JSON.stringify(loggedInAdmin)
+      );
+
+      setStaff(loggedInAdmin);
+      setAdminEmployeeId('');
+      setAdminPassword('');
+      setMessage('Admin login successful.');
+    } catch (error: any) {
+      setMessage(error.message || 'Admin login failed.');
     } finally {
       setLoading(false);
     }
@@ -133,6 +227,51 @@ export default function Home() {
 
     if (data) {
       setEntries(data as Entry[]);
+    }
+  }
+
+  async function loadAdminData() {
+    if (!staff || staff.role !== 'admin') {
+      return;
+    }
+
+    setAdminLoading(true);
+    setMessage('');
+
+    try {
+      const [staffResult, otResult] = await Promise.all([
+        supabase.rpc('admin_get_staff', {
+          p_admin_employee_id: staff.employee_id
+        }),
+        supabase.rpc('admin_get_all_ot', {
+          p_admin_employee_id: staff.employee_id
+        })
+      ]);
+
+      if (staffResult.error) {
+        throw staffResult.error;
+      }
+
+      if (otResult.error) {
+        throw otResult.error;
+      }
+
+      const staffData = Array.isArray(staffResult.data)
+        ? staffResult.data
+        : [];
+
+      const otData = Array.isArray(otResult.data)
+        ? otResult.data
+        : [];
+
+      setAdminStaff(staffData as AdminStaff[]);
+      setAdminOT(otData as AdminOT[]);
+    } catch (error: any) {
+      setMessage(
+        error.message || 'Admin data load nahi ho raha.'
+      );
+    } finally {
+      setAdminLoading(false);
     }
   }
 
@@ -260,11 +399,191 @@ export default function Home() {
     setLoading(false);
   }
 
+  async function addEmployee() {
+    if (!staff || staff.role !== 'admin') {
+      return;
+    }
+
+    if (!newEmployeeId.trim()) {
+      setMessage('Employee ID enter karo.');
+      return;
+    }
+
+    if (!newEmployeeName.trim()) {
+      setMessage('Employee Name enter karo.');
+      return;
+    }
+
+    setAdminLoading(true);
+    setMessage('');
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'admin_add_staff',
+        {
+          p_admin_employee_id: staff.employee_id,
+          p_employee_id: newEmployeeId.trim(),
+          p_name: newEmployeeName.trim()
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success === false) {
+        throw new Error(
+          data?.message || 'Employee add nahi hua.'
+        );
+      }
+
+      setNewEmployeeId('');
+      setNewEmployeeName('');
+
+      setMessage('Employee successfully added.');
+
+      await loadAdminData();
+    } catch (error: any) {
+      setMessage(
+        error.message || 'Employee add nahi hua.'
+      );
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  async function toggleEmployee(
+    staffId: number,
+    enabled: boolean
+  ) {
+    if (!staff || staff.role !== 'admin') {
+      return;
+    }
+
+    setAdminLoading(true);
+    setMessage('');
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'admin_toggle_staff',
+        {
+          p_admin_employee_id: staff.employee_id,
+          p_staff_id: staffId,
+          p_enabled: enabled
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success === false) {
+        throw new Error(
+          data?.message || 'Employee status change nahi hua.'
+        );
+      }
+
+      setMessage(
+        enabled
+          ? 'Employee enabled.'
+          : 'Employee disabled.'
+      );
+
+      await loadAdminData();
+    } catch (error: any) {
+      setMessage(
+        error.message ||
+          'Employee status change nahi hua.'
+      );
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  function downloadOTExcel() {
+    if (adminOT.length === 0) {
+      setMessage('Download ke liye OT records nahi hain.');
+      return;
+    }
+
+    const headers = [
+      'Employee ID',
+      'Employee Name',
+      'OT Date',
+      'Start Time',
+      'End Time',
+      'OT Hours',
+      'Reason',
+      'Comp-Off Date',
+      'Comp-Off Status'
+    ];
+
+    const escapeCSV = (value: any) => {
+      const text = value === null || value === undefined
+        ? ''
+        : String(value);
+
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const rows = adminOT.map((entry) => [
+      entry.employee_id,
+      entry.name,
+      entry.ot_date,
+      entry.start_time,
+      entry.end_time,
+      Number(entry.ot_hours || 0).toFixed(2),
+      entry.reason || '',
+      entry.comp_off_date || '',
+      entry.comp_off_status || ''
+    ]);
+
+    const csv = [
+      headers.map(escapeCSV).join(','),
+      ...rows.map((row) =>
+        row.map(escapeCSV).join(',')
+      )
+    ].join('\r\n');
+
+    const blob = new Blob(
+      ['\uFEFF' + csv],
+      {
+        type: 'text/csv;charset=utf-8;'
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `OT_CompOff_All_Staff_${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    setMessage(
+      `${adminOT.length} OT records Excel-compatible file me download ho gaye.`
+    );
+  }
+
   function logout() {
     localStorage.removeItem('ot_staff');
+
     setStaff(null);
     setEntries([]);
+    setAdminStaff([]);
+    setAdminOT([]);
+
     setEmployeeId('');
+    setAdminEmployeeId('');
+    setAdminPassword('');
+
+    setAdminLoginMode(false);
     setMessage('');
   }
 
@@ -275,6 +594,14 @@ export default function Home() {
       0
     );
   }, [entries]);
+
+  const adminTotalOT = useMemo(() => {
+    return adminOT.reduce(
+      (sum, entry) =>
+        sum + Number(entry.ot_hours || 0),
+      0
+    );
+  }, [adminOT]);
 
   if (!staff) {
     return (
@@ -289,33 +616,121 @@ export default function Home() {
             OT & Comp-Off
           </h1>
 
-          <p className="muted">
-            Staff Login
-          </p>
+          {!adminLoginMode ? (
+            <>
+              <p className="muted">
+                Staff Login
+              </p>
 
-          <label>
-            Employee ID
-          </label>
+              <label>
+                Employee ID
+              </label>
 
-          <input
-            value={employeeId}
-            onChange={(e) =>
-              setEmployeeId(e.target.value)
-            }
-            placeholder="Enter Employee ID"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                login();
-              }
-            }}
-          />
+              <input
+                value={employeeId}
+                onChange={(e) =>
+                  setEmployeeId(e.target.value)
+                }
+                placeholder="Enter Employee ID"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    login();
+                  }
+                }}
+              />
 
-          <button
-            onClick={login}
-            disabled={loading}
-          >
-            {loading ? 'Checking...' : 'Login'}
-          </button>
+              <button
+                onClick={login}
+                disabled={loading}
+              >
+                {loading ? 'Checking...' : 'Login'}
+              </button>
+
+              <div
+                style={{
+                  marginTop: '20px',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #ddd'
+                }}
+              >
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setAdminLoginMode(true);
+                    setMessage('');
+                  }}
+                >
+                  Admin Login
+                </button>
+              </div>
+
+              <small>
+                Staff login ke liye Employee ID required hai.
+              </small>
+            </>
+          ) : (
+            <>
+              <p className="muted">
+                Admin Login
+              </p>
+
+              <label>
+                Employee ID
+              </label>
+
+              <input
+                value={adminEmployeeId}
+                onChange={(e) =>
+                  setAdminEmployeeId(e.target.value)
+                }
+                placeholder="Enter Admin Employee ID"
+              />
+
+              <label>
+                Admin Password
+              </label>
+
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) =>
+                  setAdminPassword(e.target.value)
+                }
+                placeholder="Enter Admin Password"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    adminLogin();
+                  }
+                }}
+              />
+
+              <button
+                onClick={adminLogin}
+                disabled={loading}
+              >
+                {loading
+                  ? 'Checking...'
+                  : 'Admin Login'}
+              </button>
+
+              <button
+                className="secondary"
+                onClick={() => {
+                  setAdminLoginMode(false);
+                  setAdminEmployeeId('');
+                  setAdminPassword('');
+                  setMessage('');
+                }}
+                style={{ marginTop: '8px' }}
+              >
+                Back to Staff Login
+              </button>
+
+              <small>
+                Admin ID + Password required.
+              </small>
+            </>
+          )}
 
           {message && (
             <p className="msg">
@@ -323,11 +738,345 @@ export default function Home() {
             </p>
           )}
 
-          <small>
-            No OTP / password required.
-          </small>
+        </section>
+      </main>
+    );
+  }
+
+  if (staff.role === 'admin') {
+    return (
+      <main className="page">
+
+        <header className="topbar">
+
+          <div>
+            <b>
+              OT & Comp-Off
+            </b>
+
+            <span>
+              {' '}Admin Panel
+            </span>
+          </div>
+
+          <button
+            className="secondary"
+            onClick={logout}
+          >
+            Logout
+          </button>
+
+        </header>
+
+        <section className="welcome">
+
+          <div>
+            <p className="muted">
+              Welcome Admin
+            </p>
+
+            <h2>
+              {staff.name}
+            </h2>
+
+            <span className="pill">
+              {staff.employee_id}
+            </span>
+          </div>
+
+          <div className="stat">
+            <span>
+              Total OT
+            </span>
+
+            <b>
+              {adminTotalOT.toFixed(2)} hrs
+            </b>
+          </div>
 
         </section>
+
+        {message && (
+          <section className="card">
+            <p className="msg">
+              {message}
+            </p>
+          </section>
+        )}
+
+        <section className="card">
+
+          <div className="sectionHead">
+
+            <h3>
+              Add Employee
+            </h3>
+
+          </div>
+
+          <div className="grid">
+
+            <div>
+              <label>
+                Employee ID
+              </label>
+
+              <input
+                value={newEmployeeId}
+                onChange={(e) =>
+                  setNewEmployeeId(e.target.value)
+                }
+                placeholder="Enter Employee ID"
+              />
+            </div>
+
+            <div>
+              <label>
+                Employee Name
+              </label>
+
+              <input
+                value={newEmployeeName}
+                onChange={(e) =>
+                  setNewEmployeeName(e.target.value)
+                }
+                placeholder="Enter Employee Name"
+              />
+            </div>
+
+          </div>
+
+          <button
+            onClick={addEmployee}
+            disabled={adminLoading}
+          >
+            {adminLoading
+              ? 'Saving...'
+              : 'Add Employee'}
+          </button>
+
+        </section>
+
+        <section className="card">
+
+          <div className="sectionHead">
+
+            <h3>
+              Employee List
+            </h3>
+
+            <span className="muted">
+              {adminStaff.length} employees
+            </span>
+
+          </div>
+
+          <div className="tableWrap">
+
+            <table>
+
+              <thead>
+
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {adminStaff.map((employee) => (
+
+                  <tr key={employee.id}>
+
+                    <td>
+                      {employee.employee_id}
+                    </td>
+
+                    <td>
+                      {employee.name}
+                    </td>
+
+                    <td>
+                      {employee.role}
+                    </td>
+
+                    <td>
+                      {employee.access_enabled
+                        ? 'Active'
+                        : 'Disabled'}
+                    </td>
+
+                    <td>
+
+                      {employee.employee_id ===
+                      staff.employee_id ? (
+                        <span className="pill">
+                          Admin
+                        </span>
+                      ) : (
+                        <button
+                          className="small"
+                          onClick={() =>
+                            toggleEmployee(
+                              employee.id,
+                              !employee.access_enabled
+                            )
+                          }
+                          disabled={adminLoading}
+                        >
+                          {employee.access_enabled
+                            ? 'Disable'
+                            : 'Enable'}
+                        </button>
+                      )}
+
+                    </td>
+
+                  </tr>
+
+                ))}
+
+                {adminStaff.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        textAlign: 'center'
+                      }}
+                    >
+                      No employees found.
+                    </td>
+                  </tr>
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
+        <section className="card">
+
+          <div className="sectionHead">
+
+            <div>
+              <h3>
+                All Staff OT Records
+              </h3>
+
+              <span className="muted">
+                {adminOT.length} OT entries
+              </span>
+            </div>
+
+            <button
+              onClick={downloadOTExcel}
+              disabled={
+                adminLoading ||
+                adminOT.length === 0
+              }
+            >
+              Download Excel
+            </button>
+
+          </div>
+
+          <div className="tableWrap">
+
+            <table>
+
+              <thead>
+
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Employee Name</th>
+                  <th>OT Date</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>OT Hours</th>
+                  <th>Reason</th>
+                  <th>Comp-Off Date</th>
+                  <th>Comp-Off Status</th>
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {adminOT.map((entry) => (
+
+                  <tr key={entry.id}>
+
+                    <td>
+                      {entry.employee_id}
+                    </td>
+
+                    <td>
+                      {entry.name}
+                    </td>
+
+                    <td>
+                      {entry.ot_date}
+                    </td>
+
+                    <td>
+                      {entry.start_time}
+                    </td>
+
+                    <td>
+                      {entry.end_time}
+                    </td>
+
+                    <td>
+                      {Number(
+                        entry.ot_hours || 0
+                      ).toFixed(2)}
+                    </td>
+
+                    <td>
+                      {entry.reason || '-'}
+                    </td>
+
+                    <td>
+                      {entry.comp_off_date || '-'}
+                    </td>
+
+                    <td>
+                      {entry.comp_off_status || '-'}
+                    </td>
+
+                  </tr>
+
+                ))}
+
+                {adminOT.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      style={{
+                        textAlign: 'center'
+                      }}
+                    >
+                      No OT records found.
+                    </td>
+                  </tr>
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
       </main>
     );
   }
@@ -560,19 +1309,15 @@ export default function Home() {
                   </td>
 
                   <td>
-
                     {entry.comp_off_date
                       ? entry.comp_off_date
                       : ''}
-
                   </td>
 
                   <td>
-
                     {entry.comp_off_status
                       ? entry.comp_off_status
                       : ''}
-
                   </td>
 
                   <td>
@@ -638,9 +1383,7 @@ export default function Home() {
               ))}
 
               {entries.length === 0 && (
-
                 <tr>
-
                   <td
                     colSpan={7}
                     style={{
@@ -649,9 +1392,7 @@ export default function Home() {
                   >
                     No OT records found.
                   </td>
-
                 </tr>
-
               )}
 
             </tbody>
