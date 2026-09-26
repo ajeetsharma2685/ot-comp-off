@@ -403,7 +403,7 @@ export default function Home() {
       return;
     }
 
-    if (!confirm(`Remove ${selected.name} (${selected.employee_id})?`)) {
+    if (!window.confirm(`Remove ${selected.name} (${selected.employee_id})?`)) {
       return;
     }
 
