@@ -1,4 +1,3 @@
-```tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -21,8 +20,6 @@ type OTEntry = {
   remarks?: string;
 };
 
-type LoginMode = 'staff' | 'admin';
-
 type Page =
   | 'login'
   | 'staff-dashboard'
@@ -33,24 +30,26 @@ type Page =
   | 'admin-management'
   | 'change-password';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
 const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
 
 const MAIN_ADMIN_ID = 'SAS102';
 const SESSION_KEY = 'ot_details_session';
 
 export default function Home() {
   const [page, setPage] = useState<Page>('login');
-  const [loginMode, setLoginMode] = useState<LoginMode>('staff');
+  const [adminLogin, setAdminLogin] = useState(false);
 
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
-
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginMessage, setLoginMessage] = useState('');
 
   const [session, setSession] = useState<{
     id: number;
@@ -59,26 +58,36 @@ export default function Home() {
     role: string;
   } | null>(null);
 
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [otList, setOtList] = useState<OTEntry[]>([]);
-  const [admins, setAdmins] = useState<Staff[]>([]);
-
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [admins, setAdmins] = useState<Staff[]>([]);
+  const [otList, setOtList] = useState<OTEntry[]>([]);
 
   const [newEmployeeId, setNewEmployeeId] = useState('');
   const [newEmployeeName, setNewEmployeeName] = useState('');
 
-  const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [selectedAdminId, setSelectedAdminId] = useState('');
+  const [selectedEmployee, setSelectedEmployee] =
+    useState('');
 
-  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [selectedAdminId, setSelectedAdminId] =
+    useState('');
+
+  const [newAdminPassword, setNewAdminPassword] =
+    useState('');
+
   const [confirmAdminPassword, setConfirmAdminPassword] =
     useState('');
 
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [oldPassword, setOldPassword] =
+    useState('');
+
+  const [newPassword, setNewPassword] =
+    useState('');
+
+  const [confirmPassword, setConfirmPassword] =
+    useState('');
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -87,11 +96,15 @@ export default function Home() {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
 
-      if (!saved) return;
+      if (!saved) {
+        return;
+      }
 
       const data = JSON.parse(saved);
 
-      if (!data?.employee_id) return;
+      if (!data || !data.employee_id) {
+        return;
+      }
 
       setSession(data);
 
@@ -106,27 +119,33 @@ export default function Home() {
   }, []);
 
   const activeStaff = useMemo(() => {
-    return staffList.filter(
-      (staff) =>
-        staff.access_enabled && staff.role !== 'admin'
-    );
+    return staffList.filter(function (staff) {
+      return (
+        staff.access_enabled &&
+        staff.role !== 'admin'
+      );
+    });
   }, [staffList]);
 
   const totalOTHours = useMemo(() => {
-    return otList.reduce(
-      (total, record) =>
-        total + Number(record.ot_hours || 0),
-      0
-    );
+    return otList.reduce(function (total, record) {
+      return total + Number(record.ot_hours || 0);
+    }, 0);
   }, [otList]);
 
   const filteredOT = useMemo(() => {
-    return otList.filter((record) => {
-      if (fromDate && record.ot_date < fromDate) {
+    return otList.filter(function (record) {
+      if (
+        fromDate &&
+        record.ot_date < fromDate
+      ) {
         return false;
       }
 
-      if (toDate && record.ot_date > toDate) {
+      if (
+        toDate &&
+        record.ot_date > toDate
+      ) {
         return false;
       }
 
@@ -134,24 +153,20 @@ export default function Home() {
     });
   }, [otList, fromDate, toDate]);
 
-  function clearMessage() {
-    setMessage('');
-  }
-
   function logout() {
     localStorage.removeItem(SESSION_KEY);
 
     setSession(null);
     setPage('login');
-    setLoginMode('staff');
+    setAdminLogin(false);
 
     setEmployeeId('');
     setPassword('');
-    setLoginMessage('');
+    setMessage('');
 
     setStaffList([]);
-    setOtList([]);
     setAdmins([]);
+    setOtList([]);
   }
 
   function saveSession(data: {
@@ -174,26 +189,26 @@ export default function Home() {
     }
   }
 
-  async function handleLogin() {
-    setLoginMessage('');
+  async function login() {
+    setMessage('');
 
     const id = employeeId.trim();
 
     if (!id) {
-      setLoginMessage('Employee ID is required');
+      setMessage('Employee ID is required');
       return;
     }
 
-    if (loginMode === 'admin' && !password) {
-      setLoginMessage('Admin password is required');
+    if (adminLogin && !password) {
+      setMessage('Admin password is required');
       return;
     }
 
-    setLoginLoading(true);
+    setLoading(true);
 
     try {
-      if (loginMode === 'admin') {
-        const { data, error } = await supabase.rpc(
+      if (adminLogin) {
+        const result = await supabase.rpc(
           'admin_login',
           {
             p_employee_id: id,
@@ -201,22 +216,23 @@ export default function Home() {
           }
         );
 
-        if (error) {
-          setLoginMessage(error.message);
+        if (result.error) {
+          setMessage(result.error.message);
           return;
         }
 
-        if (!data?.success) {
-          setLoginMessage(
-            data?.message || 'Admin login failed'
+        if (!result.data?.success) {
+          setMessage(
+            result.data?.message ||
+              'Admin login failed'
           );
           return;
         }
 
         saveSession({
-          id: Number(data.staff_id),
-          employee_id: data.employee_id,
-          name: data.name,
+          id: Number(result.data.staff_id),
+          employee_id: result.data.employee_id,
+          name: result.data.name,
           role: 'admin',
         });
 
@@ -226,7 +242,7 @@ export default function Home() {
         return;
       }
 
-      const { data, error } = await supabase
+      const result = await supabase
         .from('STAFF')
         .select(
           'id, employee_id, name, access_enabled, role'
@@ -236,105 +252,148 @@ export default function Home() {
         .limit(1)
         .maybeSingle();
 
-      if (error) {
-        setLoginMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data) {
-        setLoginMessage('Employee ID not authorized');
+      if (!result.data) {
+        setMessage('Employee ID not authorized');
         return;
       }
 
-      if (data.role === 'admin') {
-        setLoginMessage(
+      if (result.data.role === 'admin') {
+        setMessage(
           'This is an Admin account. Please use Admin Login.'
         );
         return;
       }
 
       saveSession({
-        id: data.id,
-        employee_id: data.employee_id,
-        name: data.name,
-        role: data.role,
+        id: result.data.id,
+        employee_id: result.data.employee_id,
+        name: result.data.name,
+        role: result.data.role,
       });
 
       setEmployeeId('');
-      setPassword('');
     } catch (error) {
-      setLoginMessage(
+      setMessage(
         error instanceof Error
           ? error.message
           : 'Login failed'
       );
     } finally {
-      setLoginLoading(false);
+      setLoading(false);
     }
   }
 
   async function loadStaff() {
-    if (!session?.employee_id) return;
+    if (!session?.employee_id) {
+      return;
+    }
 
     setLoading(true);
-    clearMessage();
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_get_staff',
         {
-          p_admin_employee_id: session.employee_id,
-        }
+          p_admin_employee_id:
+            session.employee_id,
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to load staff'
+          result.data?.message ||
+            'Unable to load staff'
         );
         return;
       }
 
-      setStaffList(data.staff || []);
+      setStaffList(result.data.staff || []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadAdmins() {
+    if (!session?.employee_id) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const result = await supabase.rpc(
+        'admin_get_admins',
+        {
+          p_admin_employee_id:
+            session.employee_id,
+        },
+      );
+
+      if (result.error) {
+        setMessage(result.error.message);
+        return;
+      }
+
+      if (!result.data?.success) {
+        setMessage(
+          result.data?.message ||
+            'Unable to load admins'
+        );
+        return;
+      }
+
+      setAdmins(result.data.admins || []);
     } finally {
       setLoading(false);
     }
   }
 
   async function loadOT() {
-    if (!session?.employee_id) return;
+    if (!session?.employee_id) {
+      return;
+    }
 
     setLoading(true);
-    clearMessage();
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_get_all_ot',
         {
-          p_admin_employee_id: session.employee_id,
-        }
+          p_admin_employee_id:
+            session.employee_id,
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to load OT records'
+          result.data?.message ||
+            'Unable to load OT records'
         );
         return;
       }
 
       setOtList(
-        data.records ||
-          data.ot_records ||
-          data.data ||
+        result.data.records ||
+          result.data.ot_records ||
+          result.data.data ||
           []
       );
     } finally {
@@ -342,42 +401,10 @@ export default function Home() {
     }
   }
 
-  async function loadAdmins() {
-    if (!session?.employee_id) return;
-
-    setLoading(true);
-    clearMessage();
-
-    try {
-      const { data, error } = await supabase.rpc(
-        'admin_get_admins',
-        {
-          p_admin_employee_id: session.employee_id,
-        }
-      );
-
-      if (error) {
-        setMessage(error.message);
-        return;
-      }
-
-      if (!data?.success) {
-        setMessage(
-          data?.message || 'Unable to load admins'
-        );
-        return;
-      }
-
-      setAdmins(data.admins || []);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function addEmployee() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+    if (!session?.employee_id) {
+      return;
+    }
 
     if (
       !newEmployeeId.trim() ||
@@ -390,30 +417,37 @@ export default function Home() {
     }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_add_staff',
         {
-          p_admin_employee_id: session.employee_id,
-          p_employee_id: newEmployeeId.trim(),
-          p_name: newEmployeeName.trim(),
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_employee_id:
+            newEmployeeId.trim(),
+          p_name:
+            newEmployeeName.trim(),
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to add employee'
+          result.data?.message ||
+            'Unable to add employee'
         );
         return;
       }
 
-      setMessage('Employee added successfully');
+      setMessage(
+        'Employee added successfully'
+      );
 
       setNewEmployeeId('');
       setNewEmployeeName('');
@@ -425,18 +459,24 @@ export default function Home() {
   }
 
   async function removeStaff() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+    if (!session?.employee_id) {
+      return;
+    }
 
     if (!selectedEmployee) {
-      setMessage('Please select a staff member');
+      setMessage(
+        'Please select a staff member'
+      );
       return;
     }
 
     const selected = staffList.find(
-      (staff) =>
-        String(staff.id) === selectedEmployee
+      function (staff) {
+        return (
+          String(staff.id) ===
+          selectedEmployee
+        );
+      }
     );
 
     if (!selected) {
@@ -457,29 +497,36 @@ export default function Home() {
     }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_remove_staff',
         {
-          p_admin_employee_id: session.employee_id,
-          p_staff_id: Number(selectedEmployee),
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_staff_id:
+            Number(selectedEmployee),
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to remove staff'
+          result.data?.message ||
+            'Unable to remove staff'
         );
         return;
       }
 
-      setMessage('Staff removed successfully');
+      setMessage(
+        'Staff removed successfully'
+      );
+
       setSelectedEmployee('');
 
       await loadStaff();
@@ -489,12 +536,14 @@ export default function Home() {
   }
 
   async function makeAdmin() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+    if (!session?.employee_id) {
+      return;
+    }
 
     if (!selectedEmployee) {
-      setMessage('Please select an employee');
+      setMessage(
+        'Please select an employee'
+      );
       return;
     }
 
@@ -509,31 +558,39 @@ export default function Home() {
     }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_make_admin',
         {
-          p_admin_employee_id: session.employee_id,
-          p_staff_id: Number(selectedEmployee),
-          p_new_password: newAdminPassword,
-          p_confirm_password: confirmAdminPassword,
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_staff_id:
+            Number(selectedEmployee),
+          p_new_password:
+            newAdminPassword,
+          p_confirm_password:
+            confirmAdminPassword,
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to make admin'
+          result.data?.message ||
+            'Unable to make admin'
         );
         return;
       }
 
-      setMessage('Employee is now an admin');
+      setMessage(
+        'Employee is now an admin'
+      );
 
       setSelectedEmployee('');
       setNewAdminPassword('');
@@ -547,18 +604,24 @@ export default function Home() {
   }
 
   async function removeAdmin() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+    if (!session?.employee_id) {
+      return;
+    }
 
     if (!selectedAdminId) {
-      setMessage('Please select an admin');
+      setMessage(
+        'Please select an admin'
+      );
       return;
     }
 
     const selected = admins.find(
-      (admin) =>
-        String(admin.id) === selectedAdminId
+      function (admin) {
+        return (
+          String(admin.id) ===
+          selectedAdminId
+        );
+      }
     );
 
     if (!selected) {
@@ -570,7 +633,9 @@ export default function Home() {
       selected.employee_id.toUpperCase() ===
       MAIN_ADMIN_ID
     ) {
-      setMessage('Main Admin cannot be removed');
+      setMessage(
+        'Main Admin cannot be removed'
+      );
       return;
     }
 
@@ -585,29 +650,36 @@ export default function Home() {
     }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_remove_admin',
         {
-          p_admin_employee_id: session.employee_id,
-          p_target_admin_id: Number(selectedAdminId),
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_target_admin_id:
+            Number(selectedAdminId),
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message || 'Unable to remove admin'
+          result.data?.message ||
+            'Unable to remove admin'
         );
         return;
       }
 
-      setMessage('Admin removed successfully');
+      setMessage(
+        'Admin removed successfully'
+      );
+
       setSelectedAdminId('');
 
       await loadAdmins();
@@ -618,12 +690,14 @@ export default function Home() {
   }
 
   async function resetAdminPassword() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+    if (!session?.employee_id) {
+      return;
+    }
 
     if (!selectedAdminId) {
-      setMessage('Please select an admin');
+      setMessage(
+        'Please select an admin'
+      );
       return;
     }
 
@@ -638,27 +712,32 @@ export default function Home() {
     }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_reset_admin_password',
         {
-          p_admin_employee_id: session.employee_id,
-          p_target_admin_id: Number(selectedAdminId),
-          p_new_password: newAdminPassword,
-          p_confirm_password: confirmAdminPassword,
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_target_admin_id:
+            Number(selectedAdminId),
+          p_new_password:
+            newAdminPassword,
+          p_confirm_password:
+            confirmAdminPassword,
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message ||
-            'Unable to reset admin password'
+          result.data?.message ||
+            'Unable to reset password'
         );
         return;
       }
@@ -675,38 +754,45 @@ export default function Home() {
     }
   }
 
-  async function changeMyPassword() {
-    if (!session?.employee_id) return;
-
-    clearMessage();
+  async function changePassword() {
+    if (!session?.employee_id) {
+      return;
+    }
 
     setLoading(true);
+    setMessage('');
 
     try {
-      const { data, error } = await supabase.rpc(
+      const result = await supabase.rpc(
         'admin_change_password',
         {
-          p_admin_employee_id: session.employee_id,
-          p_old_password: oldPassword,
-          p_new_password: newPassword,
-          p_confirm_password: confirmPassword,
-        }
+          p_admin_employee_id:
+            session.employee_id,
+          p_old_password:
+            oldPassword,
+          p_new_password:
+            newPassword,
+          p_confirm_password:
+            confirmPassword,
+        },
       );
 
-      if (error) {
-        setMessage(error.message);
+      if (result.error) {
+        setMessage(result.error.message);
         return;
       }
 
-      if (!data?.success) {
+      if (!result.data?.success) {
         setMessage(
-          data?.message ||
+          result.data?.message ||
             'Unable to change password'
         );
         return;
       }
 
-      setMessage('Password changed successfully');
+      setMessage(
+        'Password changed successfully'
+      );
 
       setOldPassword('');
       setNewPassword('');
@@ -717,11 +803,9 @@ export default function Home() {
   }
 
   function downloadCSV() {
-    clearMessage();
-
     if (!filteredOT.length) {
       setMessage(
-        'No OT records available to download'
+        'No OT records available'
       );
       return;
     }
@@ -734,18 +818,22 @@ export default function Home() {
       'Remarks',
     ];
 
-    const rows = filteredOT.map((record) => [
-      record.employee_id,
-      record.employee_name || '',
-      record.ot_date,
-      record.ot_hours,
-      record.remarks || '',
-    ]);
+    const rows = filteredOT.map(
+      function (record) {
+        return [
+          record.employee_id,
+          record.employee_name || '',
+          record.ot_date,
+          record.ot_hours,
+          record.remarks || '',
+        ];
+      }
+    );
 
     const csv = [header, ...rows]
-      .map((row) =>
-        row
-          .map((value) => {
+      .map(function (row) {
+        return row
+          .map(function (value) {
             return (
               '"' +
               String(value ?? '').replaceAll(
@@ -755,23 +843,26 @@ export default function Home() {
               '"'
             );
           })
-          .join(',')
-      )
+          .join(',');
+      })
       .join('\n');
 
     const blob = new Blob([csv], {
       type: 'text/csv;charset=utf-8;',
     });
 
-    const url = URL.createObjectURL(blob);
+    const url =
+      URL.createObjectURL(blob);
 
-    const link = document.createElement('a');
+    const link =
+      document.createElement('a');
 
     link.href = url;
-
     link.download =
       'OT_DETAILS_' +
-      new Date().toISOString().slice(0, 10) +
+      new Date()
+        .toISOString()
+        .slice(0, 10) +
       '.csv';
 
     document.body.appendChild(link);
@@ -781,8 +872,8 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  function backToDashboard() {
-    clearMessage();
+  function backDashboard() {
+    setMessage('');
 
     if (session?.role === 'admin') {
       setPage('admin-dashboard');
@@ -793,24 +884,24 @@ export default function Home() {
 
   if (page === 'login') {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-            <div className="px-8 pt-8 pb-6 text-center border-b border-slate-100">
-              <div className="text-xs font-bold tracking-[0.25em] text-blue-700 mb-3">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+            <div className="p-8 text-center border-b border-slate-100">
+              <div className="text-sm font-bold tracking-[0.25em] text-blue-700">
                 OT DETAILS
               </div>
 
-              <h1 className="text-2xl font-bold text-slate-900">
-                {loginMode === 'staff'
-                  ? 'Staff Login'
-                  : 'Admin Login'}
+              <h1 className="text-3xl font-bold text-slate-900 mt-3">
+                {adminLogin
+                  ? 'Admin Login'
+                  : 'Staff Login'}
               </h1>
 
               <p className="text-sm text-slate-500 mt-2">
-                {loginMode === 'staff'
-                  ? 'Enter your Employee ID to continue'
-                  : 'Authorized administrators only'}
+                {adminLogin
+                  ? 'Authorized administrators only'
+                  : 'Enter your Employee ID to continue'}
               </p>
             </div>
 
@@ -821,80 +912,71 @@ export default function Home() {
 
               <input
                 value={employeeId}
-                onChange={(event) =>
-                  setEmployeeId(event.target.value)
-                }
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    handleLogin();
-                  }
+                onChange={function (event) {
+                  setEmployeeId(
+                    event.target.value
+                  );
                 }}
                 placeholder="Enter Employee ID"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="w-full border border-slate-300 rounded-xl px-4 py-3 outline-none focus:border-blue-600"
               />
 
-              {loginMode === 'admin' && (
+              {adminLogin && (
                 <>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
+                  <label className="block text-sm font-semibold text-slate-700 mt-5 mb-2">
                     Password
                   </label>
 
                   <input
                     type="password"
                     value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        handleLogin();
-                      }
+                    onChange={function (event) {
+                      setPassword(
+                        event.target.value
+                      );
                     }}
                     placeholder="Enter Admin Password"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-3 outline-none focus:border-blue-600"
                   />
                 </>
               )}
 
-              {loginMessage && (
-                <div className="mt-4 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
-                  {loginMessage}
+              {message && (
+                <div className="mt-5 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                  {message}
                 </div>
               )}
 
               <button
-                onClick={handleLogin}
-                disabled={loginLoading}
-                className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold py-3.5 transition"
+                onClick={login}
+                disabled={loading}
+                className="w-full mt-6 bg-blue-700 hover:bg-blue-800 text-white rounded-xl py-3.5 font-semibold disabled:opacity-60"
               >
-                {loginLoading
+                {loading
                   ? 'Please wait...'
-                  : loginMode === 'staff'
-                  ? 'Staff Login'
-                  : 'Admin Login'}
+                  : adminLogin
+                  ? 'Admin Login'
+                  : 'Staff Login'}
               </button>
 
-              {loginMode === 'staff' ? (
+              {!adminLogin ? (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setLoginMode('admin');
-                    setLoginMessage('');
-                    setPassword('');
+                  onClick={function () {
+                    setAdminLogin(true);
+                    setMessage('');
                   }}
-                  className="w-full mt-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 transition"
+                  className="w-full mt-4 border border-slate-300 rounded-xl py-3.5 font-semibold hover:bg-slate-50"
                 >
                   Admin Login
                 </button>
               ) : (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setLoginMode('staff');
-                    setLoginMessage('');
+                  onClick={function () {
+                    setAdminLogin(false);
                     setPassword('');
+                    setMessage('');
                   }}
-                  className="w-full mt-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 transition"
+                  className="w-full mt-4 border border-slate-300 rounded-xl py-3.5 font-semibold hover:bg-slate-50"
                 >
                   Back to Staff Login
                 </button>
@@ -913,64 +995,46 @@ export default function Home() {
   if (page === 'staff-dashboard') {
     return (
       <main className="min-h-screen bg-slate-50">
-        <header className="bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
-                OT DETAILS
-              </div>
+        <Header
+          title="Staff Portal"
+          onLogout={logout}
+        />
 
-              <div className="font-bold text-slate-900">
-                Staff Portal
-              </div>
-            </div>
+        <div className="max-w-7xl mx-auto p-6 md:p-10">
+          <p className="text-sm text-slate-500">
+            Welcome
+          </p>
 
-            <button
-              onClick={logout}
-              className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 font-semibold text-sm"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
+          <h1 className="text-3xl font-bold text-slate-900 mt-1">
+            {session?.name}
+          </h1>
 
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="mb-8">
-            <p className="text-sm text-slate-500">
-              Welcome
-            </p>
+          <p className="text-sm text-slate-500 mt-1">
+            Employee ID: {session?.employee_id}
+          </p>
 
-            <h1 className="text-3xl font-bold text-slate-900">
-              {session?.name}
-            </h1>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Employee ID: {session?.employee_id}
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <DashboardCard
+          <div className="grid md:grid-cols-3 gap-6 mt-8">
+            <Card
               title="Add OT"
               description="Submit your overtime details."
-              onClick={() =>
+              onClick={function () {
                 setMessage(
-                  'Add OT module coming next.'
-                )
-              }
+                  'Add OT module will be connected next.'
+                );
+              }}
             />
 
-            <DashboardCard
+            <Card
               title="My OT Records"
               description="View your submitted OT records."
-              onClick={() =>
+              onClick={function () {
                 setMessage(
                   'My OT Records module will be connected next.'
-                )
-              }
+                );
+              }}
             />
 
-            <DashboardCard
+            <Card
               title="Logout"
               description="Securely logout from the portal."
               onClick={logout}
@@ -978,9 +1042,7 @@ export default function Home() {
           </div>
 
           {message && (
-            <div className="mt-6 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3">
-              {message}
-            </div>
+            <Message text={message} />
           )}
         </div>
       </main>
@@ -990,156 +1052,121 @@ export default function Home() {
   if (page === 'admin-dashboard') {
     return (
       <main className="min-h-screen bg-slate-50">
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
-                OT DETAILS
-              </div>
+        <Header
+          title="Admin Portal"
+          onLogout={logout}
+        />
 
-              <div className="font-bold text-slate-900">
-                Admin Portal
-              </div>
-            </div>
+        <div className="max-w-7xl mx-auto p-6 md:p-10">
+          <p className="text-sm font-semibold text-blue-700">
+            OT DETAILS
+          </p>
 
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:block text-right">
-                <div className="text-sm font-semibold text-slate-900">
-                  {session?.name}
-                </div>
+          <h1 className="text-3xl font-bold text-slate-900 mt-1">
+            Admin Dashboard
+          </h1>
 
-                <div className="text-xs text-slate-500">
-                  {session?.employee_id}
-                </div>
-              </div>
+          <p className="text-slate-500 mt-2">
+            Manage employees, administrators and OT records.
+          </p>
 
-              <button
-                onClick={logout}
-                className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 font-semibold text-sm"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="mb-8">
-            <div className="text-sm font-semibold text-blue-700">
-              OT DETAILS
-            </div>
-
-            <h1 className="text-3xl font-bold text-slate-900 mt-1">
-              Admin Dashboard
-            </h1>
-
-            <p className="text-slate-500 mt-2">
-              Manage employees, administrators and OT records.
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-5 mb-8">
-            <OverviewCard
+          <div className="grid sm:grid-cols-3 gap-5 mt-8">
+            <Overview
               title="Active Staff"
               value={activeStaff.length}
             />
 
-            <OverviewCard
+            <Overview
               title="OT Records"
               value={otList.length}
             />
 
-            <OverviewCard
+            <Overview
               title="OT Hours"
               value={totalOTHours}
             />
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <DashboardCard
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+            <Card
               title="Staff Details"
               description="View saved staff and access status."
-              onClick={() => {
+              onClick={function () {
                 setPage('staff-details');
                 loadStaff();
               }}
             />
 
-            <DashboardCard
+            <Card
               title="Add Employee"
-              description="Add a new employee to the portal."
-              onClick={() => {
+              description="Add a new employee."
+              onClick={function () {
                 setPage('add-employee');
-                clearMessage();
+                setMessage('');
               }}
             />
 
-            <DashboardCard
+            <Card
               title="OT Records"
-              description="View, filter and download OT records."
-              onClick={() => {
+              description="View and download OT records."
+              onClick={function () {
                 setPage('ot-records');
                 loadOT();
               }}
             />
 
-            <DashboardCard
+            <Card
               title="Admin Management"
-              description="Make admin, remove admin and manage staff access."
-              onClick={() => {
+              description="Manage admin and staff access."
+              onClick={function () {
                 setPage('admin-management');
                 loadAdmins();
                 loadStaff();
               }}
             />
 
-            <DashboardCard
+            <Card
               title="Change Password"
-              description="Change your own admin password."
-              onClick={() => {
+              description="Change your admin password."
+              onClick={function () {
                 setPage('change-password');
-                clearMessage();
+                setMessage('');
               }}
             />
 
-            <DashboardCard
+            <Card
               title="Logout"
-              description="Securely logout from the portal."
+              description="Securely logout."
               onClick={logout}
             />
           </div>
         </div>
-
-        <footer className="text-center text-xs text-slate-400 py-8">
-          OT DETAILS • Management Portal
-        </footer>
       </main>
     );
   }
 
   if (page === 'staff-details') {
     return (
-      <AdminPageShell
+      <Shell
         title="Staff Details"
-        onBack={backToDashboard}
-        onLogout={logout}
+        back={backDashboard}
+        logout={logout}
       >
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="p-5 flex justify-between border-b border-slate-200">
             <div>
-              <h2 className="font-bold text-slate-900">
+              <h2 className="font-bold text-lg">
                 Saved Staff
               </h2>
 
-              <p className="text-sm text-slate-500 mt-1">
-                Active and inactive employee accounts
+              <p className="text-sm text-slate-500">
+                Active and inactive employees
               </p>
             </div>
 
             <button
               onClick={loadStaff}
-              disabled={loading}
-              className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
+              className="px-4 py-2 bg-blue-700 text-white rounded-lg"
             >
               Refresh
             </button>
@@ -1149,61 +1176,56 @@ export default function Home() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="text-left px-5 py-3">
+                  <th className="text-left p-4">
                     Employee ID
                   </th>
-
-                  <th className="text-left px-5 py-3">
+                  <th className="text-left p-4">
                     Name
                   </th>
-
-                  <th className="text-left px-5 py-3">
+                  <th className="text-left p-4">
                     Role
                   </th>
-
-                  <th className="text-left px-5 py-3">
+                  <th className="text-left p-4">
                     Access
                   </th>
                 </tr>
               </thead>
 
               <tbody>
-                {staffList.map((staff) => (
-                  <tr
-                    key={staff.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-5 py-4 font-semibold">
-                      {staff.employee_id}
-                    </td>
+                {staffList.map(
+                  function (staff) {
+                    return (
+                      <tr
+                        key={staff.id}
+                        className="border-t border-slate-100"
+                      >
+                        <td className="p-4 font-semibold">
+                          {staff.employee_id}
+                        </td>
 
-                    <td className="px-5 py-4">
-                      {staff.name}
-                    </td>
+                        <td className="p-4">
+                          {staff.name}
+                        </td>
 
-                    <td className="px-5 py-4 capitalize">
-                      {staff.role}
-                    </td>
+                        <td className="p-4 capitalize">
+                          {staff.role}
+                        </td>
 
-                    <td className="px-5 py-4">
-                      {staff.access_enabled ? (
-                        <span className="text-green-700 font-semibold">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="text-red-600 font-semibold">
-                          Disabled
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        <td className="p-4">
+                          {staff.access_enabled
+                            ? 'Active'
+                            : 'Disabled'}
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
 
                 {!staffList.length && (
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-5 py-10 text-center text-slate-500"
+                      className="p-10 text-center text-slate-500"
                     >
                       No staff records found.
                     </td>
@@ -1213,103 +1235,107 @@ export default function Home() {
             </table>
           </div>
         </div>
-      </AdminPageShell>
+      </Shell>
     );
   }
 
   if (page === 'add-employee') {
     return (
-      <AdminPageShell
+      <Shell
         title="Add Employee"
-        onBack={backToDashboard}
-        onLogout={logout}
+        back={backDashboard}
+        logout={logout}
       >
-        <div className="max-w-xl">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Employee ID
-            </label>
+        <div className="max-w-xl bg-white p-6 rounded-2xl border border-slate-200">
+          <label className="block font-semibold text-sm mb-2">
+            Employee ID
+          </label>
 
-            <input
-              value={newEmployeeId}
-              onChange={(event) =>
-                setNewEmployeeId(event.target.value)
-              }
-              placeholder="Enter Employee ID"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-            />
+          <input
+            value={newEmployeeId}
+            onChange={function (event) {
+              setNewEmployeeId(
+                event.target.value
+              );
+            }}
+            className="w-full border border-slate-300 rounded-xl px-4 py-3"
+            placeholder="Enter Employee ID"
+          />
 
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              Employee Name
-            </label>
+          <label className="block font-semibold text-sm mt-5 mb-2">
+            Employee Name
+          </label>
 
-            <input
-              value={newEmployeeName}
-              onChange={(event) =>
-                setNewEmployeeName(event.target.value)
-              }
-              placeholder="Enter Employee Name"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-            />
+          <input
+            value={newEmployeeName}
+            onChange={function (event) {
+              setNewEmployeeName(
+                event.target.value
+              );
+            }}
+            className="w-full border border-slate-300 rounded-xl px-4 py-3"
+            placeholder="Enter Employee Name"
+          />
 
-            <button
-              onClick={addEmployee}
-              disabled={loading}
-              className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold py-3.5"
-            >
-              {loading
-                ? 'Adding...'
-                : 'Add Employee'}
-            </button>
+          <button
+            onClick={addEmployee}
+            disabled={loading}
+            className="w-full mt-6 bg-blue-700 text-white rounded-xl py-3.5 font-semibold"
+          >
+            {loading
+              ? 'Adding...'
+              : 'Add Employee'}
+          </button>
 
-            {message && (
-              <div className="mt-5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 text-sm">
-                {message}
-              </div>
-            )}
-          </div>
+          {message && (
+            <Message text={message} />
+          )}
         </div>
-      </AdminPageShell>
+      </Shell>
     );
   }
 
   if (page === 'ot-records') {
     return (
-      <AdminPageShell
+      <Shell
         title="OT Records"
-        onBack={backToDashboard}
-        onLogout={logout}
+        back={backDashboard}
+        logout={logout}
       >
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200">
             <div className="grid md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block font-semibold text-sm mb-2">
                   From Date
                 </label>
 
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(event) =>
-                    setFromDate(event.target.value)
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                  onChange={function (event) {
+                    setFromDate(
+                      event.target.value
+                    );
+                  }}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block font-semibold text-sm mb-2">
                   To Date
                 </label>
 
                 <input
                   type="date"
                   value={toDate}
-                  onChange={(event) =>
-                    setToDate(event.target.value)
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                  onChange={function (event) {
+                    setToDate(
+                      event.target.value
+                    );
+                  }}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
                 />
               </div>
             </div>
@@ -1317,25 +1343,24 @@ export default function Home() {
             <div className="flex flex-wrap gap-3 mt-5">
               <button
                 onClick={loadOT}
-                disabled={loading}
-                className="px-5 py-3 rounded-xl bg-blue-700 text-white font-semibold disabled:opacity-60"
+                className="bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold"
               >
                 View Records
               </button>
 
               <button
-                onClick={() => {
+                onClick={function () {
                   setFromDate('');
                   setToDate('');
                 }}
-                className="px-5 py-3 rounded-xl border border-slate-300 font-semibold"
+                className="border border-slate-300 px-5 py-3 rounded-xl font-semibold"
               >
                 Clear
               </button>
 
               <button
                 onClick={downloadCSV}
-                className="px-5 py-3 rounded-xl border border-slate-300 font-semibold hover:bg-slate-50"
+                className="border border-slate-300 px-5 py-3 rounded-xl font-semibold"
               >
                 Download CSV
               </button>
@@ -1343,425 +1368,328 @@ export default function Home() {
           </div>
 
           <div className="grid sm:grid-cols-2 gap-5">
-            <OverviewCard
+            <Overview
               title="Records"
               value={filteredOT.length}
             />
 
-            <OverviewCard
+            <Overview
               title="Total OT Hours"
               value={filteredOT.reduce(
-                (sum, record) =>
-                  sum + Number(record.ot_hours || 0),
+                function (sum, record) {
+                  return (
+                    sum +
+                    Number(
+                      record.ot_hours || 0
+                    )
+                  );
+                },
                 0
               )}
             />
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left px-5 py-3">
+                    <th className="text-left p-4">
                       Employee ID
                     </th>
-
-                    <th className="text-left px-5 py-3">
-                      Employee Name
+                    <th className="text-left p-4">
+                      Name
                     </th>
-
-                    <th className="text-left px-5 py-3">
+                    <th className="text-left p-4">
                       OT Date
                     </th>
-
-                    <th className="text-left px-5 py-3">
+                    <th className="text-left p-4">
                       OT Hours
                     </th>
-
-                    <th className="text-left px-5 py-3">
+                    <th className="text-left p-4">
                       Remarks
                     </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {filteredOT.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="px-5 py-4 font-semibold">
-                        {record.employee_id}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {record.employee_name || '-'}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {record.ot_date}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {record.ot_hours}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {record.remarks || '-'}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {!filteredOT.length && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-10 text-center text-slate-500"
-                      >
-                        No OT records found.
-                      </td>
-                    </tr>
+                  {filteredOT.map(
+                    function (record) {
+                      return (
+                        <tr
+                          key={record.id}
+                          className="border-t border-slate-100"
+                        >
+                          <td className="p-4">
+                            {record.employee_id}
+                          </td>
+                          <td className="p-4">
+                            {record.employee_name ||
+                              '-'}
+                          </td>
+                          <td className="p-4">
+                            {record.ot_date}
+                          </td>
+                          <td className="p-4">
+                            {record.ot_hours}
+                          </td>
+                          <td className="p-4">
+                            {record.remarks || '-'}
+                          </td>
+                        </tr>
+                      );
+                    }
                   )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      </AdminPageShell>
+      </Shell>
     );
   }
 
   if (page === 'admin-management') {
-    const normalStaff = staffList.filter(
-      (staff) =>
-        staff.role !== 'admin' &&
-        staff.access_enabled
-    );
+    const normalStaff =
+      staffList.filter(function (staff) {
+        return (
+          staff.role !== 'admin' &&
+          staff.access_enabled
+        );
+      });
 
     return (
-      <AdminPageShell
+      <Shell
         title="Admin Management"
-        onBack={backToDashboard}
-        onLogout={logout}
+        back={backDashboard}
+        logout={logout}
       >
         <div className="grid lg:grid-cols-2 gap-6">
-          <ManagementCard title="Make Admin">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Select Employee
-            </label>
-
-            <select
+          <Manage title="Make Admin">
+            <Select
               value={selectedEmployee}
-              onChange={(event) =>
-                setSelectedEmployee(
-                  event.target.value
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            >
-              <option value="">
-                Select Employee
-              </option>
-
-              {normalStaff.map((staff) => (
-                <option
-                  key={staff.id}
-                  value={staff.id}
-                >
-                  {staff.employee_id} - {staff.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              New Admin Password
-            </label>
-
-            <input
-              type="password"
-              value={newAdminPassword}
-              onChange={(event) =>
-                setNewAdminPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Minimum 6 characters"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              onChange={setSelectedEmployee}
+              label="Select Employee"
+              items={normalStaff}
             />
 
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              Confirm Password
-            </label>
+            <PasswordInput
+              label="New Admin Password"
+              value={newAdminPassword}
+              onChange={setNewAdminPassword}
+            />
 
-            <input
-              type="password"
+            <PasswordInput
+              label="Confirm Password"
               value={confirmAdminPassword}
-              onChange={(event) =>
-                setConfirmAdminPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Confirm password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              onChange={setConfirmAdminPassword}
             />
 
             <button
               onClick={makeAdmin}
-              disabled={loading}
-              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5 disabled:opacity-60"
+              className="w-full mt-5 bg-blue-700 text-white rounded-xl py-3.5 font-semibold"
             >
               Make Admin
             </button>
-          </ManagementCard>
+          </Manage>
 
-          <ManagementCard title="Remove Staff">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Select Staff
-            </label>
-
-            <select
+          <Manage title="Remove Staff">
+            <Select
               value={selectedEmployee}
-              onChange={(event) =>
-                setSelectedEmployee(
-                  event.target.value
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            >
-              <option value="">
-                Select Staff
-              </option>
-
-              {normalStaff.map((staff) => (
-                <option
-                  key={staff.id}
-                  value={staff.id}
-                >
-                  {staff.employee_id} - {staff.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedEmployee}
+              label="Select Staff"
+              items={normalStaff}
+            />
 
             <button
               onClick={removeStaff}
-              disabled={loading}
-              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 disabled:opacity-60"
+              className="w-full mt-5 bg-red-600 text-white rounded-xl py-3.5 font-semibold"
             >
               Remove Staff
             </button>
 
             <p className="text-xs text-slate-500 mt-3">
-              Removing staff disables login access but
-              keeps previous OT/Comp-Off history.
+              Login access will be disabled.
+              Previous OT/Comp-Off history remains saved.
             </p>
-          </ManagementCard>
+          </Manage>
 
-          <ManagementCard title="Remove Admin">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Select Admin
-            </label>
-
-            <select
+          <Manage title="Remove Admin">
+            <Select
               value={selectedAdminId}
-              onChange={(event) =>
-                setSelectedAdminId(
-                  event.target.value
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            >
-              <option value="">
-                Select Admin
-              </option>
-
-              {admins.map((admin) => (
-                <option
-                  key={admin.id}
-                  value={admin.id}
-                >
-                  {admin.employee_id} - {admin.name}
-                  {admin.employee_id === MAIN_ADMIN_ID
-                    ? ' (Main Admin)'
-                    : ''}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedAdminId}
+              label="Select Admin"
+              items={admins}
+            />
 
             <button
               onClick={removeAdmin}
-              disabled={loading}
-              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 disabled:opacity-60"
+              className="w-full mt-5 bg-red-600 text-white rounded-xl py-3.5 font-semibold"
             >
               Remove Admin
             </button>
 
             <p className="text-xs text-slate-500 mt-3">
-              Main Admin SAS102 is permanently protected.
+              Main Admin SAS102 cannot be removed.
             </p>
-          </ManagementCard>
+          </Manage>
 
-          <ManagementCard title="Reset Admin Password">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Select Admin
-            </label>
-
-            <select
+          <Manage title="Reset Admin Password">
+            <Select
               value={selectedAdminId}
-              onChange={(event) =>
-                setSelectedAdminId(
-                  event.target.value
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            >
-              <option value="">
-                Select Admin
-              </option>
-
-              {admins.map((admin) => (
-                <option
-                  key={admin.id}
-                  value={admin.id}
-                >
-                  {admin.employee_id} - {admin.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              New Password
-            </label>
-
-            <input
-              type="password"
-              value={newAdminPassword}
-              onChange={(event) =>
-                setNewAdminPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Minimum 6 characters"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              onChange={setSelectedAdminId}
+              label="Select Admin"
+              items={admins}
             />
 
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              Confirm Password
-            </label>
+            <PasswordInput
+              label="New Password"
+              value={newAdminPassword}
+              onChange={setNewAdminPassword}
+            />
 
-            <input
-              type="password"
+            <PasswordInput
+              label="Confirm Password"
               value={confirmAdminPassword}
-              onChange={(event) =>
-                setConfirmAdminPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Confirm password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              onChange={setConfirmAdminPassword}
             />
 
             <button
               onClick={resetAdminPassword}
-              disabled={loading}
-              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5 disabled:opacity-60"
+              className="w-full mt-5 bg-blue-700 text-white rounded-xl py-3.5 font-semibold"
             >
               Reset Admin Password
             </button>
-          </ManagementCard>
+          </Manage>
         </div>
 
         {message && (
-          <div className="mt-6 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3">
-            {message}
-          </div>
+          <Message text={message} />
         )}
-      </AdminPageShell>
+      </Shell>
     );
   }
 
   if (page === 'change-password') {
     return (
-      <AdminPageShell
+      <Shell
         title="Change My Password"
-        onBack={backToDashboard}
-        onLogout={logout}
+        back={backDashboard}
+        logout={logout}
       >
-        <div className="max-w-xl">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Old Password
-            </label>
+        <div className="max-w-xl bg-white p-6 rounded-2xl border border-slate-200">
+          <PasswordInput
+            label="Old Password"
+            value={oldPassword}
+            onChange={setOldPassword}
+          />
 
-            <input
-              type="password"
-              value={oldPassword}
-              onChange={(event) =>
-                setOldPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Enter old password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            />
+          <PasswordInput
+            label="New Password"
+            value={newPassword}
+            onChange={setNewPassword}
+          />
 
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              New Password
-            </label>
+          <PasswordInput
+            label="Confirm New Password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+          />
 
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(event) =>
-                setNewPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Minimum 6 characters"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            />
+          <button
+            onClick={changePassword}
+            className="w-full mt-6 bg-blue-700 text-white rounded-xl py-3.5 font-semibold"
+          >
+            Change Password
+          </button>
 
-            <label className="block text-sm font-semibold text-slate-700 mb-2 mt-5">
-              Confirm New Password
-            </label>
-
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) =>
-                setConfirmPassword(
-                  event.target.value
-                )
-              }
-              placeholder="Confirm new password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-            />
-
-            <button
-              onClick={changeMyPassword}
-              disabled={loading}
-              className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 disabled:opacity-60"
-            >
-              {loading
-                ? 'Changing...'
-                : 'Change Password'}
-            </button>
-
-            {message && (
-              <div className="mt-5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 text-sm">
-                {message}
-              </div>
-            )}
-          </div>
+          {message && (
+            <Message text={message} />
+          )}
         </div>
-      </AdminPageShell>
+      </Shell>
     );
   }
 
   return null;
 }
 
-function DashboardCard({
+function Header({
+  title,
+  onLogout,
+}: {
+  title: string;
+  onLogout: () => void;
+}) {
+  return (
+    <header className="bg-white border-b border-slate-200">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div>
+          <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
+            OT DETAILS
+          </div>
+
+          <div className="font-bold text-slate-900">
+            {title}
+          </div>
+        </div>
+
+        <button
+          onClick={onLogout}
+          className="border border-slate-300 px-4 py-2 rounded-lg font-semibold text-sm"
+        >
+          Logout
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function Shell({
+  title,
+  children,
+  back,
+  logout,
+}: {
+  title: string;
+  children: React.ReactNode;
+  back: () => void;
+  logout: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <Header
+        title="Admin Portal"
+        onLogout={logout}
+      />
+
+      <div className="max-w-7xl mx-auto p-6 md:p-10">
+        <div className="flex justify-between items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">
+              {title}
+            </h1>
+
+            <p className="text-sm text-slate-500 mt-1">
+              OT DETAILS Management Portal
+            </p>
+          </div>
+
+          <button
+            onClick={back}
+            className="border border-slate-300 bg-white px-5 py-2.5 rounded-xl font-semibold"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+
+        {children}
+      </div>
+    </main>
+  );
+}
+
+function Card({
   title,
   description,
   onClick,
@@ -1783,14 +1711,14 @@ function DashboardCard({
         {description}
       </p>
 
-      <div className="mt-5 text-sm font-semibold text-blue-700">
+      <div className="text-sm font-semibold text-blue-700 mt-5">
         Open →
       </div>
     </button>
   );
 }
 
-function OverviewCard({
+function Overview({
   title,
   value,
 }: {
@@ -1798,7 +1726,7 @@ function OverviewCard({
   value: string | number;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6">
       <div className="text-sm text-slate-500">
         {title}
       </div>
@@ -1810,7 +1738,19 @@ function OverviewCard({
   );
 }
 
-function ManagementCard({
+function Message({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="mt-5 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-4 py-3 text-sm">
+      {text}
+    </div>
+  );
+}
+
+function Manage({
   title,
   children,
 }: {
@@ -1818,7 +1758,7 @@ function ManagementCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6">
       <h2 className="text-lg font-bold text-slate-900 mb-5">
         {title}
       </h2>
@@ -1828,63 +1768,76 @@ function ManagementCard({
   );
 }
 
-function AdminPageShell({
-  title,
-  children,
-  onBack,
-  onLogout,
+function Select({
+  label,
+  value,
+  onChange,
+  items,
 }: {
-  title: string;
-  children: React.ReactNode;
-  onBack: () => void;
-  onLogout: () => void;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  items: Staff[];
 }) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
-              OT DETAILS
-            </div>
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-2">
+        {label}
+      </label>
 
-            <div className="font-bold text-slate-900">
-              Admin Portal
-            </div>
-          </div>
+      <select
+        value={value}
+        onChange={function (event) {
+          onChange(event.target.value);
+        }}
+        className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white"
+      >
+        <option value="">
+          {label}
+        </option>
 
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 font-semibold text-sm"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              {title}
-            </h1>
-
-            <p className="text-sm text-slate-500 mt-1">
-              OT DETAILS Management Portal
-            </p>
-          </div>
-
-          <button
-            onClick={onBack}
-            className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 font-semibold text-sm"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-
-        {children}
-      </div>
-    </main>
+        {items.map(function (item) {
+          return (
+            <option
+              key={item.id}
+              value={String(item.id)}
+            >
+              {item.employee_id} - {item.name}
+              {item.employee_id === MAIN_ADMIN_ID
+                ? ' (Main Admin)'
+                : ''}
+            </option>
+          );
+        })}
+      </select>
+    </div>
   );
 }
-```
+
+function PasswordInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="mt-5">
+      <label className="block text-sm font-semibold text-slate-700 mb-2">
+        {label}
+      </label>
+
+      <input
+        type="password"
+        value={value}
+        onChange={function (event) {
+          onChange(event.target.value);
+        }}
+        placeholder="Minimum 6 characters"
+        className="w-full border border-slate-300 rounded-xl px-4 py-3"
+      />
+    </div>
+  );
+}
