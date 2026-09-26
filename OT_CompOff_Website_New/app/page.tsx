@@ -1065,12 +1065,6 @@ export default function Home() {
       return;
     }
 
-    /*
-      IMPORTANT:
-      Staff login does NOT require password.
-      Admin login requires password.
-    */
-
     if (loginMode === 'admin' && !password) {
       setMessage('Password is required');
       return;
@@ -1116,46 +1110,33 @@ export default function Home() {
         setPage('dashboard');
       } else {
         /*
-          STAFF LOGIN:
+          STAFF LOGIN
           Employee ID only.
-          No password verification.
+          Uses SECURITY DEFINER RPC so RLS
+          does not block authorized staff.
         */
 
-        const { data, error } = await supabase
-          .from('STAFF')
-          .select(
-            'id, employee_id, name, access_enabled, role'
-          )
-          .eq(
-            'employee_id',
-            employeeId.trim()
-          )
-          .eq('access_enabled', true)
-          .limit(1);
+        const { data, error } =
+          await adminRPC('staff_login', {
+            p_employee_id: employeeId.trim(),
+          });
 
         if (error) {
           setMessage(error.message);
           return;
         }
 
-        if (!data || data.length === 0) {
-          setMessage('Staff ID not authorized');
-          return;
-        }
-
-        const user = data[0];
-
-        if (user.role === 'admin') {
+        if (!data?.success) {
           setMessage(
-            'This is an Admin account. Please use Admin Login.'
+            data?.message || 'Staff ID not authorized'
           );
           return;
         }
 
         const staffUser = {
-          id: user.id,
-          employee_id: user.employee_id,
-          name: user.name,
+          id: data.staff_id,
+          employee_id: data.employee_id,
+          name: data.name,
           role: 'staff',
         };
 
@@ -1201,11 +1182,6 @@ export default function Home() {
       });
 
     if (!error && data?.success) {
-      /*
-        Backend already returns only active staff.
-        Extra frontend protection also hides
-        disabled records.
-      */
       const activeStaff = (data.staff || []).filter(
         (x: Staff) =>
           x.access_enabled === true &&
@@ -1293,6 +1269,11 @@ export default function Home() {
       setNewEmployeeId('');
       setNewEmployeeName('');
 
+      /*
+        Refresh staff list.
+        New/re-activated employee is expected
+        to have access_enabled = true.
+      */
       await loadStaff();
     } finally {
       setLoading(false);
@@ -1351,11 +1332,6 @@ export default function Home() {
 
       setSelectedStaff('');
 
-      /*
-        Reload immediately.
-        Removed employee will disappear
-        from Staff Details.
-      */
       await loadStaff();
     } finally {
       setLoading(false);
@@ -1807,8 +1783,6 @@ export default function Home() {
                     }}
                   />
                 </div>
-
-                {/* PASSWORD ONLY FOR ADMIN */}
 
                 {loginMode === 'admin' && (
                   <div className="form-group">
