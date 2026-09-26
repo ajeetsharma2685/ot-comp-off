@@ -52,7 +52,9 @@ body {
   color: #172033;
 }
 
-button, input, select {
+button,
+input,
+select {
   font: inherit;
 }
 
@@ -218,10 +220,6 @@ button {
   margin-bottom: 19px;
 }
 
-.input-wrap {
-  position: relative;
-}
-
 .form-input {
   width: 100%;
   height: 52px;
@@ -255,6 +253,13 @@ button {
 .primary-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 13px 25px rgba(37,99,235,.28);
+}
+
+.primary-btn:disabled,
+.action-btn:disabled,
+.danger-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
 }
 
 .secondary-btn {
@@ -298,7 +303,7 @@ button {
   border: 1px solid #ffd9d6;
 }
 
-/* APP HEADER */
+/* APP */
 
 .app-layout {
   min-height: 100vh;
@@ -542,7 +547,7 @@ button {
   font-weight: 800;
 }
 
-/* FEATURE CARDS */
+/* FEATURE */
 
 .section-title {
   font-size: 16px;
@@ -598,7 +603,7 @@ button {
   line-height: 1.5;
 }
 
-/* INNER PAGES */
+/* PANELS */
 
 .panel {
   background: white;
@@ -621,20 +626,6 @@ button {
   font-weight: 800;
 }
 
-.back-btn {
-  height: 40px;
-  padding: 0 14px;
-  border: 1px solid #dfe4ec;
-  background: white;
-  border-radius: 9px;
-  color: #344054;
-  font-weight: 600;
-}
-
-.back-btn:hover {
-  background: #f7f8fa;
-}
-
 .action-btn {
   height: 42px;
   padding: 0 17px;
@@ -645,6 +636,10 @@ button {
   font-weight: 700;
 }
 
+.action-btn:hover {
+  background: #10499f;
+}
+
 .danger-btn {
   height: 40px;
   padding: 0 14px;
@@ -653,6 +648,10 @@ button {
   background: #fff5f4;
   color: #b42318;
   font-weight: 700;
+}
+
+.danger-btn:hover {
+  background: #ffeceb;
 }
 
 .table-wrap {
@@ -730,16 +729,6 @@ button {
   color: #8a94a6;
   font-size: 12px;
   margin-top: 7px;
-}
-
-.button-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 7px;
-}
-
-.button-row .action-btn {
-  width: auto;
 }
 
 .two-panel {
@@ -855,11 +844,9 @@ button {
 function Header({
   title,
   session,
-  onLogout,
 }: {
   title: string;
   session: any;
-  onLogout: () => void;
 }) {
   return (
     <header className="topbar">
@@ -877,8 +864,11 @@ function Header({
             <div className="user-name">
               {session?.name || session?.employee_id}
             </div>
+
             <div className="user-role">
-              {session?.role === 'admin' ? 'Administrator' : 'Staff'}
+              {session?.role === 'admin'
+                ? 'Administrator'
+                : 'Staff'}
             </div>
           </div>
         </div>
@@ -901,9 +891,12 @@ function Sidebar({
       <div className="side-brand">
         <div className="side-brand-row">
           <div className="side-mark">OT</div>
+
           <div>
             <div className="side-title">OT DETAILS</div>
-            <div className="side-subtitle">MANAGEMENT PORTAL</div>
+            <div className="side-subtitle">
+              MANAGEMENT PORTAL
+            </div>
           </div>
         </div>
       </div>
@@ -911,7 +904,10 @@ function Sidebar({
       <div className="nav-title">Workspace</div>
 
       <button
-        className={'nav-btn ' + (page === 'dashboard' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'dashboard' ? 'active' : '')
+        }
         onClick={() => setPage('dashboard')}
       >
         <span className="nav-icon">⌂</span>
@@ -919,7 +915,10 @@ function Sidebar({
       </button>
 
       <button
-        className={'nav-btn ' + (page === 'staff' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'staff' ? 'active' : '')
+        }
         onClick={() => setPage('staff')}
       >
         <span className="nav-icon">♙</span>
@@ -927,7 +926,10 @@ function Sidebar({
       </button>
 
       <button
-        className={'nav-btn ' + (page === 'add' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'add' ? 'active' : '')
+        }
         onClick={() => setPage('add')}
       >
         <span className="nav-icon">＋</span>
@@ -935,7 +937,10 @@ function Sidebar({
       </button>
 
       <button
-        className={'nav-btn ' + (page === 'ot' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'ot' ? 'active' : '')
+        }
         onClick={() => setPage('ot')}
       >
         <span className="nav-icon">▣</span>
@@ -943,7 +948,10 @@ function Sidebar({
       </button>
 
       <button
-        className={'nav-btn ' + (page === 'admin' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'admin' ? 'active' : '')
+        }
         onClick={() => setPage('admin')}
       >
         <span className="nav-icon">⚙</span>
@@ -951,7 +959,10 @@ function Sidebar({
       </button>
 
       <button
-        className={'nav-btn ' + (page === 'password' ? 'active' : '')}
+        className={
+          'nav-btn ' +
+          (page === 'password' ? 'active' : '')
+        }
         onClick={() => setPage('password')}
       >
         <span className="nav-icon">⌁</span>
@@ -959,7 +970,10 @@ function Sidebar({
       </button>
 
       <div className="side-bottom">
-        <button className="logout-btn" onClick={onLogout}>
+        <button
+          className="logout-btn"
+          onClick={onLogout}
+        >
           ⇥ &nbsp; Logout
         </button>
       </div>
@@ -969,7 +983,8 @@ function Sidebar({
 
 export default function Home() {
   const [session, setSession] = useState<any>(null);
-  const [loginMode, setLoginMode] = useState<'staff' | 'admin'>('staff');
+  const [loginMode, setLoginMode] =
+    useState<'staff' | 'admin'>('staff');
 
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
@@ -977,32 +992,43 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [page, setPage] = useState<Page>('dashboard');
+  const [page, setPage] =
+    useState<Page>('dashboard');
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [admins, setAdmins] = useState<Staff[]>([]);
-  const [otRecords, setOtRecords] = useState<OTEntry[]>([]);
+  const [otRecords, setOtRecords] =
+    useState<OTEntry[]>([]);
 
-  const [newEmployeeId, setNewEmployeeId] = useState('');
-  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [newEmployeeId, setNewEmployeeId] =
+    useState('');
+  const [newEmployeeName, setNewEmployeeName] =
+    useState('');
 
-  const [selectedStaff, setSelectedStaff] = useState('');
-  const [selectedAdmin, setSelectedAdmin] = useState('');
+  const [selectedStaff, setSelectedStaff] =
+    useState('');
+  const [selectedAdmin, setSelectedAdmin] =
+    useState('');
 
-  const [adminPassword, setAdminPassword] = useState('');
+  const [adminPassword, setAdminPassword] =
+    useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] =
     useState('');
 
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [oldPassword, setOldPassword] =
+    useState('');
+  const [newPassword, setNewPassword] =
+    useState('');
+  const [confirmPassword, setConfirmPassword] =
+    useState('');
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SESSION_KEY);
+      const saved =
+        localStorage.getItem(SESSION_KEY);
 
       if (saved) {
         setSession(JSON.parse(saved));
@@ -1025,15 +1051,27 @@ export default function Home() {
     return supabase.rpc(functionName, params);
   }
 
+  /* LOGIN */
+
   async function login() {
     setMessage('');
 
     if (!employeeId.trim()) {
-      setMessage('Employee ID is required');
+      setMessage(
+        loginMode === 'staff'
+          ? 'Employee ID is required'
+          : 'Admin ID is required'
+      );
       return;
     }
 
-    if (!password) {
+    /*
+      IMPORTANT:
+      Staff login does NOT require password.
+      Admin login requires password.
+    */
+
+    if (loginMode === 'admin' && !password) {
       setMessage('Password is required');
       return;
     }
@@ -1042,10 +1080,11 @@ export default function Home() {
 
     try {
       if (loginMode === 'admin') {
-        const { data, error } = await adminRPC('admin_login', {
-          p_employee_id: employeeId.trim(),
-          p_password: password,
-        });
+        const { data, error } =
+          await adminRPC('admin_login', {
+            p_employee_id: employeeId.trim(),
+            p_password: password,
+          });
 
         if (error) {
           setMessage(error.message);
@@ -1053,7 +1092,9 @@ export default function Home() {
         }
 
         if (!data?.success) {
-          setMessage(data?.message || 'Admin login failed');
+          setMessage(
+            data?.message || 'Admin login failed'
+          );
           return;
         }
 
@@ -1064,16 +1105,31 @@ export default function Home() {
           role: 'admin',
         };
 
-        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        localStorage.setItem(
+          SESSION_KEY,
+          JSON.stringify(user)
+        );
+
         setSession(user);
         setEmployeeId('');
         setPassword('');
         setPage('dashboard');
       } else {
+        /*
+          STAFF LOGIN:
+          Employee ID only.
+          No password verification.
+        */
+
         const { data, error } = await supabase
           .from('STAFF')
-          .select('*')
-          .eq('employee_id', employeeId.trim())
+          .select(
+            'id, employee_id, name, access_enabled, role'
+          )
+          .eq(
+            'employee_id',
+            employeeId.trim()
+          )
           .eq('access_enabled', true)
           .limit(1);
 
@@ -1090,7 +1146,9 @@ export default function Home() {
         const user = data[0];
 
         if (user.role === 'admin') {
-          setMessage('This is an Admin account. Please use Admin Login.');
+          setMessage(
+            'This is an Admin account. Please use Admin Login.'
+          );
           return;
         }
 
@@ -1121,7 +1179,11 @@ export default function Home() {
     setLoginMode('staff');
     setPage('dashboard');
     setMessage('');
+    setEmployeeId('');
+    setPassword('');
   }
+
+  /* ADMIN DATA */
 
   async function loadDashboardData() {
     if (!session?.employee_id) return;
@@ -1132,19 +1194,34 @@ export default function Home() {
   }
 
   async function loadStaff() {
-    const { data, error } = await adminRPC('admin_get_staff', {
-      p_admin_employee_id: session.employee_id,
-    });
+    const { data, error } =
+      await adminRPC('admin_get_staff', {
+        p_admin_employee_id:
+          session.employee_id,
+      });
 
     if (!error && data?.success) {
-      setStaff(data.staff || []);
+      /*
+        Backend already returns only active staff.
+        Extra frontend protection also hides
+        disabled records.
+      */
+      const activeStaff = (data.staff || []).filter(
+        (x: Staff) =>
+          x.access_enabled === true &&
+          x.role !== 'admin'
+      );
+
+      setStaff(activeStaff);
     }
   }
 
   async function loadAdmins() {
-    const { data, error } = await adminRPC('admin_get_admins', {
-      p_admin_employee_id: session.employee_id,
-    });
+    const { data, error } =
+      await adminRPC('admin_get_admins', {
+        p_admin_employee_id:
+          session.employee_id,
+      });
 
     if (!error && data?.success) {
       setAdmins(data.admins || []);
@@ -1152,31 +1229,48 @@ export default function Home() {
   }
 
   async function loadOT() {
-    const { data, error } = await adminRPC('admin_get_all_ot', {
-      p_admin_employee_id: session.employee_id,
-    });
+    const { data, error } =
+      await adminRPC('admin_get_all_ot', {
+        p_admin_employee_id:
+          session.employee_id,
+      });
 
     if (!error && data?.success) {
-      setOtRecords(data.records || data.ot_records || []);
+      setOtRecords(
+        data.records ||
+          data.ot_records ||
+          []
+      );
     }
   }
+
+  /* ADD EMPLOYEE */
 
   async function addEmployee() {
     setMessage('');
 
-    if (!newEmployeeId.trim() || !newEmployeeName.trim()) {
-      setMessage('Employee ID and Name are required');
+    if (
+      !newEmployeeId.trim() ||
+      !newEmployeeName.trim()
+    ) {
+      setMessage(
+        'Employee ID and Name are required'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC('admin_add_staff', {
-        p_admin_employee_id: session.employee_id,
-        p_employee_id: newEmployeeId.trim(),
-        p_name: newEmployeeName.trim(),
-      });
+      const { data, error } =
+        await adminRPC('admin_add_staff', {
+          p_admin_employee_id:
+            session.employee_id,
+          p_employee_id:
+            newEmployeeId.trim(),
+          p_name:
+            newEmployeeName.trim(),
+        });
 
       if (error) {
         setMessage(error.message);
@@ -1184,28 +1278,41 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to add employee');
+        setMessage(
+          data?.message ||
+            'Unable to add employee'
+        );
         return;
       }
 
-      setMessage('Employee added successfully');
+      setMessage(
+        data?.message ||
+          'Employee added successfully'
+      );
+
       setNewEmployeeId('');
       setNewEmployeeName('');
+
       await loadStaff();
     } finally {
       setLoading(false);
     }
   }
 
+  /* REMOVE STAFF */
+
   async function removeStaff() {
     setMessage('');
 
     const selected = staff.find(
-      (x) => String(x.id) === selectedStaff
+      (x) =>
+        String(x.id) === selectedStaff
     );
 
     if (!selected) {
-      setMessage('Please select a staff member');
+      setMessage(
+        'Please select a staff member'
+      );
       return;
     }
 
@@ -1222,57 +1329,93 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC('admin_remove_staff', {
-        p_admin_employee_id: session.employee_id,
-        p_staff_id: selected.id,
-      });
+      const { data, error } =
+        await adminRPC(
+          'admin_remove_staff',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+            p_staff_id: selected.id,
+          }
+        );
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setMessage(data?.message || 'Staff removed');
+      setMessage(
+        data?.message ||
+          'Staff removed successfully'
+      );
+
       setSelectedStaff('');
+
+      /*
+        Reload immediately.
+        Removed employee will disappear
+        from Staff Details.
+      */
       await loadStaff();
     } finally {
       setLoading(false);
     }
   }
 
+  /* MAKE ADMIN */
+
   async function makeAdmin() {
     setMessage('');
 
     const selected = staff.find(
-      (x) => String(x.id) === selectedStaff
+      (x) =>
+        String(x.id) === selectedStaff
     );
 
     if (!selected) {
-      setMessage('Please select an employee');
+      setMessage(
+        'Please select an employee'
+      );
       return;
     }
 
-    if (!adminPassword || !adminConfirmPassword) {
-      setMessage('Admin password and confirm password are required');
+    if (
+      !adminPassword ||
+      !adminConfirmPassword
+    ) {
+      setMessage(
+        'Admin password and confirm password are required'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC('admin_make_admin', {
-        p_admin_employee_id: session.employee_id,
-        p_staff_id: selected.id,
-        p_new_password: adminPassword,
-        p_confirm_password: adminConfirmPassword,
-      });
+      const { data, error } =
+        await adminRPC(
+          'admin_make_admin',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+            p_staff_id: selected.id,
+            p_new_password:
+              adminPassword,
+            p_confirm_password:
+              adminConfirmPassword,
+          }
+        );
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setMessage(data?.message || 'Employee is now an admin');
+      setMessage(
+        data?.message ||
+          'Employee is now an admin'
+      );
+
       setSelectedStaff('');
       setAdminPassword('');
       setAdminConfirmPassword('');
@@ -1284,15 +1427,20 @@ export default function Home() {
     }
   }
 
+  /* REMOVE ADMIN */
+
   async function removeAdmin() {
     setMessage('');
 
     const selected = admins.find(
-      (x) => String(x.id) === selectedAdmin
+      (x) =>
+        String(x.id) === selectedAdmin
     );
 
     if (!selected) {
-      setMessage('Please select an admin');
+      setMessage(
+        'Please select an admin'
+      );
       return;
     }
 
@@ -1309,17 +1457,27 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC('admin_remove_admin', {
-        p_admin_employee_id: session.employee_id,
-        p_target_admin_id: selected.id,
-      });
+      const { data, error } =
+        await adminRPC(
+          'admin_remove_admin',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+            p_target_admin_id:
+              selected.id,
+          }
+        );
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setMessage(data?.message || 'Admin removed successfully');
+      setMessage(
+        data?.message ||
+          'Admin removed successfully'
+      );
+
       setSelectedAdmin('');
 
       await loadAdmins();
@@ -1329,31 +1487,45 @@ export default function Home() {
     }
   }
 
+  /* RESET ADMIN PASSWORD */
+
   async function resetAdminPassword() {
     setMessage('');
 
     if (!selectedAdmin) {
-      setMessage('Please select an admin');
+      setMessage(
+        'Please select an admin'
+      );
       return;
     }
 
-    if (!adminPassword || !adminConfirmPassword) {
-      setMessage('New password and confirm password are required');
+    if (
+      !adminPassword ||
+      !adminConfirmPassword
+    ) {
+      setMessage(
+        'New password and confirm password are required'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC(
-        'admin_reset_admin_password',
-        {
-          p_admin_employee_id: session.employee_id,
-          p_target_admin_id: Number(selectedAdmin),
-          p_new_password: adminPassword,
-          p_confirm_password: adminConfirmPassword,
-        }
-      );
+      const { data, error } =
+        await adminRPC(
+          'admin_reset_admin_password',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+            p_target_admin_id:
+              Number(selectedAdmin),
+            p_new_password:
+              adminPassword,
+            p_confirm_password:
+              adminConfirmPassword,
+          }
+        );
 
       if (error) {
         setMessage(error.message);
@@ -1361,7 +1533,8 @@ export default function Home() {
       }
 
       setMessage(
-        data?.message || 'Admin password reset successfully'
+        data?.message ||
+          'Admin password reset successfully'
       );
 
       setAdminPassword('');
@@ -1371,43 +1544,59 @@ export default function Home() {
     }
   }
 
+  /* CHANGE PASSWORD */
+
   async function changePassword() {
     setMessage('');
 
     if (!oldPassword) {
-      setMessage('Old password is required');
+      setMessage(
+        'Old password is required'
+      );
       return;
     }
 
     if (!newPassword) {
-      setMessage('New password is required');
+      setMessage(
+        'New password is required'
+      );
       return;
     }
 
     if (!confirmPassword) {
-      setMessage('Confirm password is required');
+      setMessage(
+        'Confirm password is required'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await adminRPC(
-        'admin_change_password',
-        {
-          p_admin_employee_id: session.employee_id,
-          p_old_password: oldPassword,
-          p_new_password: newPassword,
-          p_confirm_password: confirmPassword,
-        }
-      );
+      const { data, error } =
+        await adminRPC(
+          'admin_change_password',
+          {
+            p_admin_employee_id:
+              session.employee_id,
+            p_old_password:
+              oldPassword,
+            p_new_password:
+              newPassword,
+            p_confirm_password:
+              confirmPassword,
+          }
+        );
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setMessage(data?.message || 'Password changed successfully');
+      setMessage(
+        data?.message ||
+          'Password changed successfully'
+      );
 
       setOldPassword('');
       setNewPassword('');
@@ -1417,30 +1606,49 @@ export default function Home() {
     }
   }
 
+  /* OT FILTER */
+
   const filteredOT = useMemo(() => {
     return otRecords.filter((row) => {
-      if (fromDate && row.ot_date && row.ot_date < fromDate) {
+      if (
+        fromDate &&
+        row.ot_date &&
+        row.ot_date < fromDate
+      ) {
         return false;
       }
 
-      if (toDate && row.ot_date && row.ot_date > toDate) {
+      if (
+        toDate &&
+        row.ot_date &&
+        row.ot_date > toDate
+      ) {
         return false;
       }
 
       return true;
     });
-  }, [otRecords, fromDate, toDate]);
+  }, [
+    otRecords,
+    fromDate,
+    toDate,
+  ]);
 
   const totalHours = useMemo(() => {
     return filteredOT.reduce(
-      (sum, row) => sum + Number(row.ot_hours || 0),
+      (sum, row) =>
+        sum + Number(row.ot_hours || 0),
       0
     );
   }, [filteredOT]);
 
+  /* DOWNLOAD */
+
   function downloadCSV() {
     if (!filteredOT.length) {
-      setMessage('No OT records available');
+      setMessage(
+        'No OT records available'
+      );
       return;
     }
 
@@ -1472,30 +1680,45 @@ export default function Home() {
     ]
       .map((row) =>
         row
-          .map((value) =>
-            '"' +
-            String(value).replace(/"/g, '""') +
-            '"'
+          .map(
+            (value) =>
+              '"' +
+              String(value).replace(
+                /"/g,
+                '""'
+              ) +
+              '"'
           )
           .join(',')
       )
       .join('\n');
 
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;',
-    });
+    const blob = new Blob(
+      [csv],
+      {
+        type:
+          'text/csv;charset=utf-8;',
+      }
+    );
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
 
     link.href = url;
-    link.download = 'OT_Records.csv';
+    link.download =
+      'OT_Records.csv';
+
+    document.body.appendChild(link);
     link.click();
+    link.remove();
 
     URL.revokeObjectURL(url);
   }
 
-  /* LOGIN */
+  /* LOGIN SCREEN */
 
   if (!session) {
     return (
@@ -1507,21 +1730,25 @@ export default function Home() {
 
             <div className="login-brand">
               <div className="brand-logo">
-                <div className="brand-mark">OT</div>
+                <div className="brand-mark">
+                  OT
+                </div>
 
                 <h1 className="brand-title">
                   OT DETAILS
                 </h1>
 
                 <p className="brand-subtitle">
-                  Centralized overtime and employee
-                  management portal for secure and
-                  efficient workforce operations.
+                  Centralized overtime and
+                  employee management portal
+                  for secure and efficient
+                  workforce operations.
                 </p>
               </div>
 
               <div className="brand-bottom">
                 <div className="brand-line" />
+
                 <div className="brand-small">
                   Secure Management Portal
                 </div>
@@ -1540,7 +1767,7 @@ export default function Home() {
 
                   <p>
                     {loginMode === 'staff'
-                      ? 'Sign in to access your OT workspace'
+                      ? 'Enter your Employee ID to continue'
                       : 'Authorized administrators only'}
                   </p>
                 </div>
@@ -1562,7 +1789,9 @@ export default function Home() {
                     className="form-input"
                     value={employeeId}
                     onChange={(e) =>
-                      setEmployeeId(e.target.value)
+                      setEmployeeId(
+                        e.target.value
+                      )
                     }
                     placeholder={
                       loginMode === 'staff'
@@ -1570,29 +1799,43 @@ export default function Home() {
                         : 'Enter Admin ID'
                     }
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') login();
+                      if (
+                        e.key === 'Enter'
+                      ) {
+                        login();
+                      }
                     }}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Password
-                  </label>
+                {/* PASSWORD ONLY FOR ADMIN */}
 
-                  <input
-                    className="form-input"
-                    type="password"
-                    value={password}
-                    onChange={(e) =>
-                      setPassword(e.target.value)
-                    }
-                    placeholder="Enter password"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') login();
-                    }}
-                  />
-                </div>
+                {loginMode === 'admin' && (
+                  <div className="form-group">
+                    <label className="form-label">
+                      Password
+                    </label>
+
+                    <input
+                      className="form-input"
+                      type="password"
+                      value={password}
+                      onChange={(e) =>
+                        setPassword(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Enter password"
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === 'Enter'
+                        ) {
+                          login();
+                        }
+                      }}
+                    />
+                  </div>
+                )}
 
                 <button
                   className="primary-btn"
@@ -1601,14 +1844,18 @@ export default function Home() {
                 >
                   {loading
                     ? 'Signing in...'
-                    : 'Sign In'}
+                    : loginMode === 'staff'
+                    ? 'Login as Staff'
+                    : 'Login as Admin'}
                 </button>
 
                 <div className="login-switch">
                   {loginMode === 'staff' ? (
                     <button
                       onClick={() => {
-                        setLoginMode('admin');
+                        setLoginMode(
+                          'admin'
+                        );
                         setMessage('');
                         setEmployeeId('');
                         setPassword('');
@@ -1619,7 +1866,9 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={() => {
-                        setLoginMode('staff');
+                        setLoginMode(
+                          'staff'
+                        );
                         setMessage('');
                         setEmployeeId('');
                         setPassword('');
@@ -1639,7 +1888,7 @@ export default function Home() {
     );
   }
 
-  /* STAFF */
+  /* STAFF PORTAL */
 
   if (session.role !== 'admin') {
     return (
@@ -1650,13 +1899,18 @@ export default function Home() {
           <div className="app-layout">
 
             <aside className="sidebar">
+
               <div className="side-brand">
                 <div className="side-brand-row">
-                  <div className="side-mark">OT</div>
+                  <div className="side-mark">
+                    OT
+                  </div>
+
                   <div>
                     <div className="side-title">
                       OT DETAILS
                     </div>
+
                     <div className="side-subtitle">
                       STAFF PORTAL
                     </div>
@@ -1671,8 +1925,13 @@ export default function Home() {
               <button
                 className="nav-btn active"
               >
-                <span className="nav-icon">⌂</span>
-                <span>My Dashboard</span>
+                <span className="nav-icon">
+                  ⌂
+                </span>
+
+                <span>
+                  My Dashboard
+                </span>
               </button>
 
               <button
@@ -1683,8 +1942,13 @@ export default function Home() {
                   )
                 }
               >
-                <span className="nav-icon">＋</span>
-                <span>Add OT</span>
+                <span className="nav-icon">
+                  ＋
+                </span>
+
+                <span>
+                  Add OT
+                </span>
               </button>
 
               <button
@@ -1695,8 +1959,13 @@ export default function Home() {
                   )
                 }
               >
-                <span className="nav-icon">▣</span>
-                <span>My OT Records</span>
+                <span className="nav-icon">
+                  ▣
+                </span>
+
+                <span>
+                  My OT Records
+                </span>
               </button>
 
               <div className="side-bottom">
@@ -1707,13 +1976,14 @@ export default function Home() {
                   ⇥ &nbsp; Logout
                 </button>
               </div>
+
             </aside>
 
             <main className="main-area">
+
               <Header
                 title="Staff Dashboard"
                 session={session}
-                onLogout={logout}
               />
 
               <div className="content">
@@ -1722,9 +1992,10 @@ export default function Home() {
                   <h1>
                     Welcome, {session.name}
                   </h1>
+
                   <p>
-                    Manage your overtime information
-                    from one place.
+                    Manage your overtime
+                    information from one place.
                   </p>
                 </div>
 
@@ -1809,7 +2080,8 @@ export default function Home() {
                     </div>
 
                     <div className="feature-desc">
-                      Submit your overtime details.
+                      Submit your overtime
+                      details.
                     </div>
                   </div>
 
@@ -1830,7 +2102,8 @@ export default function Home() {
                     </div>
 
                     <div className="feature-desc">
-                      View your previous overtime records.
+                      View your previous
+                      overtime records.
                     </div>
                   </div>
 
@@ -1845,7 +2118,7 @@ export default function Home() {
     );
   }
 
-  /* ADMIN */
+  /* ADMIN PORTAL */
 
   return (
     <>
@@ -1880,7 +2153,6 @@ export default function Home() {
                   : 'Change Password'
               }
               session={session}
-              onLogout={logout}
             />
 
             <div className="content">
@@ -1899,8 +2171,10 @@ export default function Home() {
                     <h1>
                       Good day, {session.name}
                     </h1>
+
                     <p>
-                      Here is your OT DETAILS overview.
+                      Here is your OT DETAILS
+                      overview.
                     </p>
                   </div>
 
@@ -1970,7 +2244,9 @@ export default function Home() {
 
                     <div
                       className="feature-card"
-                      onClick={() => setPage('staff')}
+                      onClick={() =>
+                        setPage('staff')
+                      }
                     >
                       <div className="feature-icon">
                         ♙
@@ -1981,14 +2257,17 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        View active employees and
-                        manage staff access.
+                        View active employees
+                        and manage staff
+                        access.
                       </div>
                     </div>
 
                     <div
                       className="feature-card"
-                      onClick={() => setPage('add')}
+                      onClick={() =>
+                        setPage('add')
+                      }
                     >
                       <div className="feature-icon">
                         ＋
@@ -1999,13 +2278,16 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        Create a new staff account.
+                        Create or reactivate
+                        a staff account.
                       </div>
                     </div>
 
                     <div
                       className="feature-card"
-                      onClick={() => setPage('ot')}
+                      onClick={() =>
+                        setPage('ot')
+                      }
                     >
                       <div className="feature-icon">
                         ▣
@@ -2016,14 +2298,17 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        View, filter and download
-                        overtime records.
+                        View, filter and
+                        download overtime
+                        records.
                       </div>
                     </div>
 
                     <div
                       className="feature-card"
-                      onClick={() => setPage('admin')}
+                      onClick={() =>
+                        setPage('admin')
+                      }
                     >
                       <div className="feature-icon">
                         ⚙
@@ -2034,14 +2319,16 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        Manage administrators and
-                        staff permissions.
+                        Manage administrators
+                        and staff permissions.
                       </div>
                     </div>
 
                     <div
                       className="feature-card"
-                      onClick={() => setPage('password')}
+                      onClick={() =>
+                        setPage('password')
+                      }
                     >
                       <div className="feature-icon">
                         ⌁
@@ -2052,8 +2339,8 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        Securely update your admin
-                        password.
+                        Securely update your
+                        admin password.
                       </div>
                     </div>
 
@@ -2070,8 +2357,8 @@ export default function Home() {
                       </div>
 
                       <div className="feature-desc">
-                        Sign out securely from the
-                        management portal.
+                        Sign out securely from
+                        the management portal.
                       </div>
                     </div>
 
@@ -2099,51 +2386,73 @@ export default function Home() {
 
                   <div className="table-wrap">
                     <table className="data-table">
+
                       <thead>
                         <tr>
-                          <th>Employee ID</th>
-                          <th>Name</th>
-                          <th>Role</th>
-                          <th>Status</th>
+                          <th>
+                            Employee ID
+                          </th>
+
+                          <th>
+                            Name
+                          </th>
+
+                          <th>
+                            Role
+                          </th>
+
+                          <th>
+                            Status
+                          </th>
                         </tr>
                       </thead>
 
                       <tbody>
+
                         {staff.map((s) => (
                           <tr key={s.id}>
+
                             <td>
                               <strong>
                                 {s.employee_id}
                               </strong>
                             </td>
 
-                            <td>{s.name}</td>
-
                             <td>
-                              {s.employee_id ===
-                              MAIN_ADMIN_ID
-                                ? 'Main Admin'
-                                : s.role === 'admin'
-                                ? 'Admin'
-                                : 'Staff'}
+                              {s.name}
                             </td>
 
                             <td>
-                              <span
-                                className={
-                                  'badge ' +
-                                  (s.access_enabled
-                                    ? 'badge-active'
-                                    : 'badge-off')
-                                }
-                              >
-                                {s.access_enabled
-                                  ? 'Active'
-                                  : 'Disabled'}
+                              Staff
+                            </td>
+
+                            <td>
+                              <span className="badge badge-active">
+                                Active
                               </span>
                             </td>
+
                           </tr>
                         ))}
+
+                        {!staff.length && (
+                          <tr>
+                            <td
+                              colSpan={4}
+                              style={{
+                                textAlign:
+                                  'center',
+                                padding: 35,
+                                color:
+                                  '#8a94a6',
+                              }}
+                            >
+                              No active staff
+                              found.
+                            </td>
+                          </tr>
+                        )}
+
                       </tbody>
                     </table>
                   </div>
@@ -2163,7 +2472,9 @@ export default function Home() {
                       </div>
 
                       <div className="helper">
-                        Create a new staff login.
+                        Add a new employee or
+                        reactivate a previously
+                        removed employee.
                       </div>
                     </div>
                   </div>
@@ -2233,8 +2544,8 @@ export default function Home() {
                       </div>
 
                       <div className="helper">
-                        Filter and download overtime
-                        records.
+                        Filter and download
+                        overtime records.
                       </div>
                     </div>
 
@@ -2258,7 +2569,9 @@ export default function Home() {
                         type="date"
                         value={fromDate}
                         onChange={(e) =>
-                          setFromDate(e.target.value)
+                          setFromDate(
+                            e.target.value
+                          )
                         }
                       />
                     </div>
@@ -2273,7 +2586,9 @@ export default function Home() {
                         type="date"
                         value={toDate}
                         onChange={(e) =>
-                          setToDate(e.target.value)
+                          setToDate(
+                            e.target.value
+                          )
                         }
                       />
                     </div>
@@ -2282,12 +2597,16 @@ export default function Home() {
 
                   <div
                     className="stats-grid"
-                    style={{ marginTop: 20 }}
+                    style={{
+                      marginTop: 20,
+                    }}
                   >
+
                     <div className="stat-card">
                       <div className="stat-label">
                         FILTERED RECORDS
                       </div>
+
                       <div className="stat-value">
                         {filteredOT.length}
                       </div>
@@ -2297,8 +2616,11 @@ export default function Home() {
                       <div className="stat-label">
                         OT HOURS
                       </div>
+
                       <div className="stat-value">
-                        {totalHours.toFixed(2)}
+                        {totalHours.toFixed(
+                          2
+                        )}
                       </div>
                     </div>
 
@@ -2306,61 +2628,103 @@ export default function Home() {
                       <div className="stat-label">
                         STATUS
                       </div>
+
                       <div className="stat-value">
                         Ready
                       </div>
                     </div>
+
                   </div>
 
                   <div className="table-wrap">
                     <table className="data-table">
+
                       <thead>
                         <tr>
-                          <th>Employee ID</th>
+                          <th>
+                            Employee ID
+                          </th>
                           <th>Name</th>
                           <th>Date</th>
                           <th>Start</th>
                           <th>End</th>
                           <th>Hours</th>
-                          <th>Comp Off</th>
+                          <th>
+                            Comp Off
+                          </th>
                         </tr>
                       </thead>
 
                       <tbody>
-                        {filteredOT.map((r, i) => (
-                          <tr key={r.id || i}>
-                            <td>{r.employee_id || '-'}</td>
-                            <td>{r.name || '-'}</td>
-                            <td>{r.ot_date || '-'}</td>
-                            <td>{r.start_time || '-'}</td>
-                            <td>{r.end_time || '-'}</td>
-                            <td>
-                              {Number(
-                                r.ot_hours || 0
-                              ).toFixed(2)}
-                            </td>
-                            <td>
-                              {r.comp_off
-                                ? 'Yes'
-                                : 'No'}
-                            </td>
-                          </tr>
-                        ))}
+
+                        {filteredOT.map(
+                          (r, i) => (
+                            <tr
+                              key={
+                                r.id || i
+                              }
+                            >
+                              <td>
+                                {r.employee_id ||
+                                  '-'}
+                              </td>
+
+                              <td>
+                                {r.name ||
+                                  '-'}
+                              </td>
+
+                              <td>
+                                {r.ot_date ||
+                                  '-'}
+                              </td>
+
+                              <td>
+                                {r.start_time ||
+                                  '-'}
+                              </td>
+
+                              <td>
+                                {r.end_time ||
+                                  '-'}
+                              </td>
+
+                              <td>
+                                {Number(
+                                  r.ot_hours ||
+                                    0
+                                ).toFixed(
+                                  2
+                                )}
+                              </td>
+
+                              <td>
+                                {r.comp_off
+                                  ? 'Yes'
+                                  : 'No'}
+                              </td>
+                            </tr>
+                          )
+                        )}
 
                         {!filteredOT.length && (
                           <tr>
                             <td
                               colSpan={7}
                               style={{
-                                textAlign: 'center',
+                                textAlign:
+                                  'center',
                                 padding: 35,
-                                color: '#8a94a6',
+                                color:
+                                  '#8a94a6',
                               }}
                             >
-                              No OT records found.
+                              No OT records
+                              found.
                             </td>
                           </tr>
                         )}
+
                       </tbody>
                     </table>
                   </div>
@@ -2373,6 +2737,8 @@ export default function Home() {
               {page === 'admin' && (
                 <div className="two-panel">
 
+                  {/* MAKE ADMIN */}
+
                   <div className="panel">
 
                     <div className="panel-header">
@@ -2380,9 +2746,10 @@ export default function Home() {
                         <div className="panel-title">
                           Make Admin
                         </div>
+
                         <div className="helper">
-                          Give admin access to a staff
-                          member.
+                          Give admin access to
+                          a staff member.
                         </div>
                       </div>
                     </div>
@@ -2394,7 +2761,9 @@ export default function Home() {
 
                       <select
                         className="select-box"
-                        value={selectedStaff}
+                        value={
+                          selectedStaff
+                        }
                         onChange={(e) =>
                           setSelectedStaff(
                             e.target.value
@@ -2408,7 +2777,8 @@ export default function Home() {
                         {staff
                           .filter(
                             (s) =>
-                              s.role !== 'admin' &&
+                              s.role !==
+                                'admin' &&
                               s.access_enabled
                           )
                           .map((s) => (
@@ -2416,7 +2786,8 @@ export default function Home() {
                               key={s.id}
                               value={s.id}
                             >
-                              {s.employee_id} - {s.name}
+                              {s.employee_id} -
+                              {s.name}
                             </option>
                           ))}
                       </select>
@@ -2430,7 +2801,9 @@ export default function Home() {
                       <input
                         className="form-input"
                         type="password"
-                        value={adminPassword}
+                        value={
+                          adminPassword
+                        }
                         onChange={(e) =>
                           setAdminPassword(
                             e.target.value
@@ -2448,7 +2821,9 @@ export default function Home() {
                       <input
                         className="form-input"
                         type="password"
-                        value={adminConfirmPassword}
+                        value={
+                          adminConfirmPassword
+                        }
                         onChange={(e) =>
                           setAdminConfirmPassword(
                             e.target.value
@@ -2468,6 +2843,8 @@ export default function Home() {
 
                   </div>
 
+                  {/* REMOVE STAFF */}
+
                   <div className="panel">
 
                     <div className="panel-header">
@@ -2477,7 +2854,8 @@ export default function Home() {
                         </div>
 
                         <div className="helper">
-                          Disable staff login while
+                          Remove staff from
+                          active list while
                           preserving OT history.
                         </div>
                       </div>
@@ -2490,7 +2868,9 @@ export default function Home() {
 
                       <select
                         className="select-box"
-                        value={selectedStaff}
+                        value={
+                          selectedStaff
+                        }
                         onChange={(e) =>
                           setSelectedStaff(
                             e.target.value
@@ -2504,7 +2884,8 @@ export default function Home() {
                         {staff
                           .filter(
                             (s) =>
-                              s.role !== 'admin' &&
+                              s.role !==
+                                'admin' &&
                               s.access_enabled
                           )
                           .map((s) => (
@@ -2512,7 +2893,8 @@ export default function Home() {
                               key={s.id}
                               value={s.id}
                             >
-                              {s.employee_id} - {s.name}
+                              {s.employee_id} -
+                              {s.name}
                             </option>
                           ))}
                       </select>
@@ -2521,11 +2903,21 @@ export default function Home() {
                     <button
                       className="danger-btn"
                       onClick={removeStaff}
+                      disabled={loading}
                     >
                       Remove Staff
                     </button>
 
+                    <div className="helper">
+                      After removal, the employee
+                      will disappear from Staff
+                      Details and can be added again
+                      later using the same Employee ID.
+                    </div>
+
                   </div>
+
+                  {/* ADMIN ACCOUNTS */}
 
                   <div className="panel">
 
@@ -2536,7 +2928,8 @@ export default function Home() {
                         </div>
 
                         <div className="helper">
-                          Main Admin SAS102 is protected.
+                          Main Admin SAS102 is
+                          protected.
                         </div>
                       </div>
                     </div>
@@ -2548,7 +2941,9 @@ export default function Home() {
 
                       <select
                         className="select-box"
-                        value={selectedAdmin}
+                        value={
+                          selectedAdmin
+                        }
                         onChange={(e) =>
                           setSelectedAdmin(
                             e.target.value
@@ -2564,7 +2959,8 @@ export default function Home() {
                             key={a.id}
                             value={a.id}
                           >
-                            {a.employee_id} - {a.name}
+                            {a.employee_id} -
+                            {a.name}
                           </option>
                         ))}
                       </select>
@@ -2573,11 +2969,14 @@ export default function Home() {
                     <button
                       className="danger-btn"
                       onClick={removeAdmin}
+                      disabled={loading}
                     >
                       Remove Admin
                     </button>
 
                   </div>
+
+                  {/* RESET ADMIN PASSWORD */}
 
                   <div className="panel">
 
@@ -2588,8 +2987,8 @@ export default function Home() {
                         </div>
 
                         <div className="helper">
-                          Reset the password of an
-                          existing admin.
+                          Reset the password of
+                          an existing admin.
                         </div>
                       </div>
                     </div>
@@ -2601,7 +3000,9 @@ export default function Home() {
 
                       <select
                         className="select-box"
-                        value={selectedAdmin}
+                        value={
+                          selectedAdmin
+                        }
                         onChange={(e) =>
                           setSelectedAdmin(
                             e.target.value
@@ -2617,7 +3018,8 @@ export default function Home() {
                             key={a.id}
                             value={a.id}
                           >
-                            {a.employee_id} - {a.name}
+                            {a.employee_id} -
+                            {a.name}
                           </option>
                         ))}
                       </select>
@@ -2631,7 +3033,9 @@ export default function Home() {
                       <input
                         className="form-input"
                         type="password"
-                        value={adminPassword}
+                        value={
+                          adminPassword
+                        }
                         onChange={(e) =>
                           setAdminPassword(
                             e.target.value
@@ -2649,7 +3053,9 @@ export default function Home() {
                       <input
                         className="form-input"
                         type="password"
-                        value={adminConfirmPassword}
+                        value={
+                          adminConfirmPassword
+                        }
                         onChange={(e) =>
                           setAdminConfirmPassword(
                             e.target.value
@@ -2661,7 +3067,9 @@ export default function Home() {
 
                     <button
                       className="action-btn"
-                      onClick={resetAdminPassword}
+                      onClick={
+                        resetAdminPassword
+                      }
                       disabled={loading}
                     >
                       Reset Password
@@ -2689,8 +3097,9 @@ export default function Home() {
                       </div>
 
                       <div className="helper">
-                        Enter your current password
-                        before creating a new one.
+                        Enter your current
+                        password before
+                        creating a new one.
                       </div>
                     </div>
                   </div>
@@ -2764,6 +3173,7 @@ export default function Home() {
 
             </div>
           </main>
+
         </div>
       </div>
     </>
