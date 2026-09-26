@@ -21,25 +21,26 @@ type OTEntry = {
   remarks?: string;
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const MAIN_ADMIN_ID = 'SAS102';
-const SESSION_KEY = 'ot_details_session';
+type LoginMode = 'staff' | 'admin';
 
 type Page =
   | 'login'
-  | 'admin-dashboard'
   | 'staff-dashboard'
+  | 'admin-dashboard'
   | 'staff-details'
   | 'add-employee'
   | 'ot-records'
   | 'admin-management'
   | 'change-password';
 
-type LoginMode = 'staff' | 'admin';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const MAIN_ADMIN_ID = 'SAS102';
+const SESSION_KEY = 'ot_details_session';
 
 export default function Home() {
   const [page, setPage] = useState<Page>('login');
@@ -47,6 +48,7 @@ export default function Home() {
 
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
+
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginMessage, setLoginMessage] = useState('');
 
@@ -71,7 +73,8 @@ export default function Home() {
   const [selectedAdminId, setSelectedAdminId] = useState('');
 
   const [newAdminPassword, setNewAdminPassword] = useState('');
-  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] =
+    useState('');
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -84,45 +87,49 @@ export default function Home() {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
 
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      if (!saved) return;
 
-        if (parsed?.employee_id) {
-          setSession(parsed);
+      const data = JSON.parse(saved);
 
-          if (parsed.role === 'admin') {
-            setPage('admin-dashboard');
-          } else {
-            setPage('staff-dashboard');
-          }
-        }
+      if (!data?.employee_id) return;
+
+      setSession(data);
+
+      if (data.role === 'admin') {
+        setPage('admin-dashboard');
+      } else {
+        setPage('staff-dashboard');
       }
     } catch {
       localStorage.removeItem(SESSION_KEY);
     }
   }, []);
 
-  const activeStaff = useMemo(
-    () =>
-      staffList.filter(
-        (item) => item.access_enabled && item.role !== 'admin'
-      ),
-    [staffList]
-  );
+  const activeStaff = useMemo(() => {
+    return staffList.filter(
+      (staff) =>
+        staff.access_enabled && staff.role !== 'admin'
+    );
+  }, [staffList]);
 
-  const totalOTHours = useMemo(
-    () =>
-      otList.reduce(
-        (sum, item) => sum + Number(item.ot_hours || 0),
-        0
-      ),
-    [otList]
-  );
+  const totalOTHours = useMemo(() => {
+    return otList.reduce(
+      (total, record) =>
+        total + Number(record.ot_hours || 0),
+      0
+    );
+  }, [otList]);
 
   const filteredOT = useMemo(() => {
-    return otList.filter((item) => {
-      if (fromDate && item.ot_date < fromDate) return false;
-      if (toDate && item.ot_date > toDate) return false;
+    return otList.filter((record) => {
+      if (fromDate && record.ot_date < fromDate) {
+        return false;
+      }
+
+      if (toDate && record.ot_date > toDate) {
+        return false;
+      }
+
       return true;
     });
   }, [otList, fromDate, toDate]);
@@ -135,11 +142,12 @@ export default function Home() {
     localStorage.removeItem(SESSION_KEY);
 
     setSession(null);
+    setPage('login');
+    setLoginMode('staff');
+
     setEmployeeId('');
     setPassword('');
     setLoginMessage('');
-    setLoginMode('staff');
-    setPage('login');
 
     setStaffList([]);
     setOtList([]);
@@ -153,7 +161,11 @@ export default function Home() {
     role: string;
   }) {
     setSession(data);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify(data)
+    );
 
     if (data.role === 'admin') {
       setPage('admin-dashboard');
@@ -181,10 +193,13 @@ export default function Home() {
 
     try {
       if (loginMode === 'admin') {
-        const { data, error } = await supabase.rpc('admin_login', {
-          p_employee_id: id,
-          p_password: password,
-        });
+        const { data, error } = await supabase.rpc(
+          'admin_login',
+          {
+            p_employee_id: id,
+            p_password: password,
+          }
+        );
 
         if (error) {
           setLoginMessage(error.message);
@@ -192,7 +207,9 @@ export default function Home() {
         }
 
         if (!data?.success) {
-          setLoginMessage(data?.message || 'Admin login failed');
+          setLoginMessage(
+            data?.message || 'Admin login failed'
+          );
           return;
         }
 
@@ -205,6 +222,7 @@ export default function Home() {
 
         setEmployeeId('');
         setPassword('');
+
         return;
       }
 
@@ -244,9 +262,11 @@ export default function Home() {
 
       setEmployeeId('');
       setPassword('');
-    } catch (err) {
+    } catch (error) {
       setLoginMessage(
-        err instanceof Error ? err.message : 'Login failed'
+        error instanceof Error
+          ? error.message
+          : 'Login failed'
       );
     } finally {
       setLoginLoading(false);
@@ -273,7 +293,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to load staff');
+        setMessage(
+          data?.message || 'Unable to load staff'
+        );
         return;
       }
 
@@ -303,11 +325,18 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to load OT records');
+        setMessage(
+          data?.message || 'Unable to load OT records'
+        );
         return;
       }
 
-      setOtList(data.records || data.ot_records || []);
+      setOtList(
+        data.records ||
+          data.ot_records ||
+          data.data ||
+          []
+      );
     } finally {
       setLoading(false);
     }
@@ -333,7 +362,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to load admins');
+        setMessage(
+          data?.message || 'Unable to load admins'
+        );
         return;
       }
 
@@ -348,8 +379,13 @@ export default function Home() {
 
     clearMessage();
 
-    if (!newEmployeeId.trim() || !newEmployeeName.trim()) {
-      setMessage('Employee ID and Name are required');
+    if (
+      !newEmployeeId.trim() ||
+      !newEmployeeName.trim()
+    ) {
+      setMessage(
+        'Employee ID and Name are required'
+      );
       return;
     }
 
@@ -371,7 +407,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to add employee');
+        setMessage(
+          data?.message || 'Unable to add employee'
+        );
         return;
       }
 
@@ -389,13 +427,16 @@ export default function Home() {
   async function removeStaff() {
     if (!session?.employee_id) return;
 
+    clearMessage();
+
     if (!selectedEmployee) {
       setMessage('Please select a staff member');
       return;
     }
 
     const selected = staffList.find(
-      (item) => String(item.id) === selectedEmployee
+      (staff) =>
+        String(staff.id) === selectedEmployee
     );
 
     if (!selected) {
@@ -403,12 +444,19 @@ export default function Home() {
       return;
     }
 
-    if (!window.confirm(`Remove ${selected.name} (${selected.employee_id})?`)) {
+    const confirmed = window.confirm(
+      'Remove ' +
+        selected.name +
+        ' (' +
+        selected.employee_id +
+        ')?'
+    );
+
+    if (!confirmed) {
       return;
     }
 
     setLoading(true);
-    clearMessage();
 
     try {
       const { data, error } = await supabase.rpc(
@@ -425,7 +473,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to remove staff');
+        setMessage(
+          data?.message || 'Unable to remove staff'
+        );
         return;
       }
 
@@ -441,18 +491,24 @@ export default function Home() {
   async function makeAdmin() {
     if (!session?.employee_id) return;
 
+    clearMessage();
+
     if (!selectedEmployee) {
       setMessage('Please select an employee');
       return;
     }
 
-    if (!newAdminPassword || !confirmAdminPassword) {
-      setMessage('New admin password and confirm password are required');
+    if (
+      !newAdminPassword ||
+      !confirmAdminPassword
+    ) {
+      setMessage(
+        'New admin password and confirm password are required'
+      );
       return;
     }
 
     setLoading(true);
-    clearMessage();
 
     try {
       const { data, error } = await supabase.rpc(
@@ -471,7 +527,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to make admin');
+        setMessage(
+          data?.message || 'Unable to make admin'
+        );
         return;
       }
 
@@ -491,13 +549,16 @@ export default function Home() {
   async function removeAdmin() {
     if (!session?.employee_id) return;
 
+    clearMessage();
+
     if (!selectedAdminId) {
       setMessage('Please select an admin');
       return;
     }
 
     const selected = admins.find(
-      (item) => String(item.id) === selectedAdminId
+      (admin) =>
+        String(admin.id) === selectedAdminId
     );
 
     if (!selected) {
@@ -506,18 +567,24 @@ export default function Home() {
     }
 
     if (
-      selected.employee_id.toUpperCase() === MAIN_ADMIN_ID
+      selected.employee_id.toUpperCase() ===
+      MAIN_ADMIN_ID
     ) {
       setMessage('Main Admin cannot be removed');
       return;
     }
 
-    if (!confirm(`Remove admin access from ${selected.name}?`)) {
+    const confirmed = window.confirm(
+      'Remove admin access from ' +
+        selected.name +
+        '?'
+    );
+
+    if (!confirmed) {
       return;
     }
 
     setLoading(true);
-    clearMessage();
 
     try {
       const { data, error } = await supabase.rpc(
@@ -534,7 +601,9 @@ export default function Home() {
       }
 
       if (!data?.success) {
-        setMessage(data?.message || 'Unable to remove admin');
+        setMessage(
+          data?.message || 'Unable to remove admin'
+        );
         return;
       }
 
@@ -551,18 +620,24 @@ export default function Home() {
   async function resetAdminPassword() {
     if (!session?.employee_id) return;
 
+    clearMessage();
+
     if (!selectedAdminId) {
       setMessage('Please select an admin');
       return;
     }
 
-    if (!newAdminPassword || !confirmAdminPassword) {
-      setMessage('New password and confirm password are required');
+    if (
+      !newAdminPassword ||
+      !confirmAdminPassword
+    ) {
+      setMessage(
+        'New password and confirm password are required'
+      );
       return;
     }
 
     setLoading(true);
-    clearMessage();
 
     try {
       const { data, error } = await supabase.rpc(
@@ -582,12 +657,15 @@ export default function Home() {
 
       if (!data?.success) {
         setMessage(
-          data?.message || 'Unable to reset admin password'
+          data?.message ||
+            'Unable to reset admin password'
         );
         return;
       }
 
-      setMessage('Admin password reset successfully');
+      setMessage(
+        'Admin password reset successfully'
+      );
 
       setSelectedAdminId('');
       setNewAdminPassword('');
@@ -600,8 +678,9 @@ export default function Home() {
   async function changeMyPassword() {
     if (!session?.employee_id) return;
 
-    setLoading(true);
     clearMessage();
+
+    setLoading(true);
 
     try {
       const { data, error } = await supabase.rpc(
@@ -621,7 +700,8 @@ export default function Home() {
 
       if (!data?.success) {
         setMessage(
-          data?.message || 'Unable to change password'
+          data?.message ||
+            'Unable to change password'
         );
         return;
       }
@@ -637,8 +717,12 @@ export default function Home() {
   }
 
   function downloadCSV() {
+    clearMessage();
+
     if (!filteredOT.length) {
-      setMessage('No OT records available to download');
+      setMessage(
+        'No OT records available to download'
+      );
       return;
     }
 
@@ -650,23 +734,27 @@ export default function Home() {
       'Remarks',
     ];
 
-    const rows = filteredOT.map((item) => [
-      item.employee_id,
-      item.employee_name || '',
-      item.ot_date,
-      item.ot_hours,
-      item.remarks || '',
+    const rows = filteredOT.map((record) => [
+      record.employee_id,
+      record.employee_name || '',
+      record.ot_date,
+      record.ot_hours,
+      record.remarks || '',
     ]);
 
-    const csv = [
-      header,
-      ...rows,
-    ]
+    const csv = [header, ...rows]
       .map((row) =>
         row
-          .map((value) =>
-            `"${String(value ?? '').replaceAll('"', '""')}"`
-          )
+          .map((value) => {
+            return (
+              '"' +
+              String(value ?? '').replaceAll(
+                '"',
+                '""'
+              ) +
+              '"'
+            );
+          })
           .join(',')
       )
       .join('\n');
@@ -676,59 +764,31 @@ export default function Home() {
     });
 
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
 
-    a.href = url;
-    a.download = `OT_DETAILS_${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
+    const link = document.createElement('a');
 
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    link.href = url;
+
+    link.download =
+      'OT_DETAILS_' +
+      new Date().toISOString().slice(0, 10) +
+      '.csv';
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
     URL.revokeObjectURL(url);
   }
 
-  function openAdminDashboard() {
-    setPage('admin-dashboard');
-    clearMessage();
-  }
-
-  function openStaffDetails() {
-    setPage('staff-details');
-    loadStaff();
-  }
-
-  function openAddEmployee() {
-    setPage('add-employee');
-    clearMessage();
-  }
-
-  function openOTRecords() {
-    setPage('ot-records');
-    loadOT();
-  }
-
-  function openAdminManagement() {
-    setPage('admin-management');
-    loadAdmins();
-    loadStaff();
-  }
-
-  function openChangePassword() {
-    setPage('change-password');
-    clearMessage();
-  }
-
   function backToDashboard() {
+    clearMessage();
+
     if (session?.role === 'admin') {
       setPage('admin-dashboard');
     } else {
       setPage('staff-dashboard');
     }
-
-    clearMessage();
   }
 
   if (page === 'login') {
@@ -761,9 +821,13 @@ export default function Home() {
 
               <input
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleLogin();
+                onChange={(event) =>
+                  setEmployeeId(event.target.value)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    handleLogin();
+                  }
                 }}
                 placeholder="Enter Employee ID"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -778,9 +842,13 @@ export default function Home() {
                   <input
                     type="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleLogin();
+                    onChange={(event) =>
+                      setPassword(event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        handleLogin();
+                      }
                     }}
                     placeholder="Enter Admin Password"
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -828,7 +896,7 @@ export default function Home() {
                   }}
                   className="w-full mt-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 transition"
                 >
-                  ← Back to Staff Login
+                  Back to Staff Login
                 </button>
               )}
 
@@ -851,6 +919,7 @@ export default function Home() {
               <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
                 OT DETAILS
               </div>
+
               <div className="font-bold text-slate-900">
                 Staff Portal
               </div>
@@ -870,9 +939,11 @@ export default function Home() {
             <p className="text-sm text-slate-500">
               Welcome
             </p>
+
             <h1 className="text-3xl font-bold text-slate-900">
               {session?.name}
             </h1>
+
             <p className="text-sm text-slate-500 mt-1">
               Employee ID: {session?.employee_id}
             </p>
@@ -882,7 +953,11 @@ export default function Home() {
             <DashboardCard
               title="Add OT"
               description="Submit your overtime details."
-              onClick={() => setMessage('Add OT module coming next.')}
+              onClick={() =>
+                setMessage(
+                  'Add OT module coming next.'
+                )
+              }
             />
 
             <DashboardCard
@@ -921,6 +996,7 @@ export default function Home() {
               <div className="text-xs font-bold tracking-[0.2em] text-blue-700">
                 OT DETAILS
               </div>
+
               <div className="font-bold text-slate-900">
                 Admin Portal
               </div>
@@ -931,6 +1007,7 @@ export default function Home() {
                 <div className="text-sm font-semibold text-slate-900">
                   {session?.name}
                 </div>
+
                 <div className="text-xs text-slate-500">
                   {session?.employee_id}
                 </div>
@@ -951,9 +1028,11 @@ export default function Home() {
             <div className="text-sm font-semibold text-blue-700">
               OT DETAILS
             </div>
+
             <h1 className="text-3xl font-bold text-slate-900 mt-1">
               Admin Dashboard
             </h1>
+
             <p className="text-slate-500 mt-2">
               Manage employees, administrators and OT records.
             </p>
@@ -980,31 +1059,47 @@ export default function Home() {
             <DashboardCard
               title="Staff Details"
               description="View saved staff and access status."
-              onClick={openStaffDetails}
+              onClick={() => {
+                setPage('staff-details');
+                loadStaff();
+              }}
             />
 
             <DashboardCard
               title="Add Employee"
               description="Add a new employee to the portal."
-              onClick={openAddEmployee}
+              onClick={() => {
+                setPage('add-employee');
+                clearMessage();
+              }}
             />
 
             <DashboardCard
               title="OT Records"
               description="View, filter and download OT records."
-              onClick={openOTRecords}
+              onClick={() => {
+                setPage('ot-records');
+                loadOT();
+              }}
             />
 
             <DashboardCard
               title="Admin Management"
               description="Make admin, remove admin and manage staff access."
-              onClick={openAdminManagement}
+              onClick={() => {
+                setPage('admin-management');
+                loadAdmins();
+                loadStaff();
+              }}
             />
 
             <DashboardCard
               title="Change Password"
               description="Change your own admin password."
-              onClick={openChangePassword}
+              onClick={() => {
+                setPage('change-password');
+                clearMessage();
+              }}
             />
 
             <DashboardCard
@@ -1035,6 +1130,7 @@ export default function Home() {
               <h2 className="font-bold text-slate-900">
                 Saved Staff
               </h2>
+
               <p className="text-sm text-slate-500 mt-1">
                 Active and inactive employee accounts
               </p>
@@ -1043,7 +1139,7 @@ export default function Home() {
             <button
               onClick={loadStaff}
               disabled={loading}
-              className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-semibold"
+              className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
             >
               Refresh
             </button>
@@ -1053,10 +1149,21 @@ export default function Home() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="text-left px-5 py-3">Employee ID</th>
-                  <th className="text-left px-5 py-3">Name</th>
-                  <th className="text-left px-5 py-3">Role</th>
-                  <th className="text-left px-5 py-3">Access</th>
+                  <th className="text-left px-5 py-3">
+                    Employee ID
+                  </th>
+
+                  <th className="text-left px-5 py-3">
+                    Name
+                  </th>
+
+                  <th className="text-left px-5 py-3">
+                    Role
+                  </th>
+
+                  <th className="text-left px-5 py-3">
+                    Access
+                  </th>
                 </tr>
               </thead>
 
@@ -1069,12 +1176,15 @@ export default function Home() {
                     <td className="px-5 py-4 font-semibold">
                       {staff.employee_id}
                     </td>
+
                     <td className="px-5 py-4">
                       {staff.name}
                     </td>
+
                     <td className="px-5 py-4 capitalize">
                       {staff.role}
                     </td>
+
                     <td className="px-5 py-4">
                       {staff.access_enabled ? (
                         <span className="text-green-700 font-semibold">
@@ -1122,8 +1232,8 @@ export default function Home() {
 
             <input
               value={newEmployeeId}
-              onChange={(e) =>
-                setNewEmployeeId(e.target.value)
+              onChange={(event) =>
+                setNewEmployeeId(event.target.value)
               }
               placeholder="Enter Employee ID"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -1135,8 +1245,8 @@ export default function Home() {
 
             <input
               value={newEmployeeName}
-              onChange={(e) =>
-                setNewEmployeeName(e.target.value)
+              onChange={(event) =>
+                setNewEmployeeName(event.target.value)
               }
               placeholder="Enter Employee Name"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -1147,7 +1257,9 @@ export default function Home() {
               disabled={loading}
               className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold py-3.5"
             >
-              {loading ? 'Adding...' : 'Add Employee'}
+              {loading
+                ? 'Adding...'
+                : 'Add Employee'}
             </button>
 
             {message && (
@@ -1179,7 +1291,9 @@ export default function Home() {
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  onChange={(event) =>
+                    setFromDate(event.target.value)
+                  }
                   className="w-full rounded-xl border border-slate-300 px-4 py-3"
                 />
               </div>
@@ -1192,7 +1306,9 @@ export default function Home() {
                 <input
                   type="date"
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
+                  onChange={(event) =>
+                    setToDate(event.target.value)
+                  }
                   className="w-full rounded-xl border border-slate-300 px-4 py-3"
                 />
               </div>
@@ -1202,7 +1318,7 @@ export default function Home() {
               <button
                 onClick={loadOT}
                 disabled={loading}
-                className="px-5 py-3 rounded-xl bg-blue-700 text-white font-semibold"
+                className="px-5 py-3 rounded-xl bg-blue-700 text-white font-semibold disabled:opacity-60"
               >
                 View Records
               </button>
@@ -1235,8 +1351,8 @@ export default function Home() {
             <OverviewCard
               title="Total OT Hours"
               value={filteredOT.reduce(
-                (sum, item) =>
-                  sum + Number(item.ot_hours || 0),
+                (sum, record) =>
+                  sum + Number(record.ot_hours || 0),
                 0
               )}
             />
@@ -1250,15 +1366,19 @@ export default function Home() {
                     <th className="text-left px-5 py-3">
                       Employee ID
                     </th>
+
                     <th className="text-left px-5 py-3">
                       Employee Name
                     </th>
+
                     <th className="text-left px-5 py-3">
                       OT Date
                     </th>
+
                     <th className="text-left px-5 py-3">
                       OT Hours
                     </th>
+
                     <th className="text-left px-5 py-3">
                       Remarks
                     </th>
@@ -1266,25 +1386,29 @@ export default function Home() {
                 </thead>
 
                 <tbody>
-                  {filteredOT.map((item) => (
+                  {filteredOT.map((record) => (
                     <tr
-                      key={item.id}
+                      key={record.id}
                       className="border-t border-slate-100"
                     >
                       <td className="px-5 py-4 font-semibold">
-                        {item.employee_id}
+                        {record.employee_id}
                       </td>
+
                       <td className="px-5 py-4">
-                        {item.employee_name || '-'}
+                        {record.employee_name || '-'}
                       </td>
+
                       <td className="px-5 py-4">
-                        {item.ot_date}
+                        {record.ot_date}
                       </td>
+
                       <td className="px-5 py-4">
-                        {item.ot_hours}
+                        {record.ot_hours}
                       </td>
+
                       <td className="px-5 py-4">
-                        {item.remarks || '-'}
+                        {record.remarks || '-'}
                       </td>
                     </tr>
                   ))}
@@ -1310,9 +1434,9 @@ export default function Home() {
 
   if (page === 'admin-management') {
     const normalStaff = staffList.filter(
-      (item) =>
-        item.role !== 'admin' &&
-        item.access_enabled
+      (staff) =>
+        staff.role !== 'admin' &&
+        staff.access_enabled
     );
 
     return (
@@ -1329,15 +1453,22 @@ export default function Home() {
 
             <select
               value={selectedEmployee}
-              onChange={(e) =>
-                setSelectedEmployee(e.target.value)
+              onChange={(event) =>
+                setSelectedEmployee(
+                  event.target.value
+                )
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
             >
-              <option value="">Select Employee</option>
+              <option value="">
+                Select Employee
+              </option>
 
               {normalStaff.map((staff) => (
-                <option key={staff.id} value={staff.id}>
+                <option
+                  key={staff.id}
+                  value={staff.id}
+                >
                   {staff.employee_id} - {staff.name}
                 </option>
               ))}
@@ -1350,8 +1481,10 @@ export default function Home() {
             <input
               type="password"
               value={newAdminPassword}
-              onChange={(e) =>
-                setNewAdminPassword(e.target.value)
+              onChange={(event) =>
+                setNewAdminPassword(
+                  event.target.value
+                )
               }
               placeholder="Minimum 6 characters"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1364,8 +1497,10 @@ export default function Home() {
             <input
               type="password"
               value={confirmAdminPassword}
-              onChange={(e) =>
-                setConfirmAdminPassword(e.target.value)
+              onChange={(event) =>
+                setConfirmAdminPassword(
+                  event.target.value
+                )
               }
               placeholder="Confirm password"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1374,7 +1509,7 @@ export default function Home() {
             <button
               onClick={makeAdmin}
               disabled={loading}
-              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5"
+              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5 disabled:opacity-60"
             >
               Make Admin
             </button>
@@ -1387,15 +1522,22 @@ export default function Home() {
 
             <select
               value={selectedEmployee}
-              onChange={(e) =>
-                setSelectedEmployee(e.target.value)
+              onChange={(event) =>
+                setSelectedEmployee(
+                  event.target.value
+                )
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
             >
-              <option value="">Select Staff</option>
+              <option value="">
+                Select Staff
+              </option>
 
               {normalStaff.map((staff) => (
-                <option key={staff.id} value={staff.id}>
+                <option
+                  key={staff.id}
+                  value={staff.id}
+                >
                   {staff.employee_id} - {staff.name}
                 </option>
               ))}
@@ -1404,14 +1546,14 @@ export default function Home() {
             <button
               onClick={removeStaff}
               disabled={loading}
-              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5"
+              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 disabled:opacity-60"
             >
               Remove Staff
             </button>
 
             <p className="text-xs text-slate-500 mt-3">
-              Removing staff disables login access but keeps
-              previous OT/Comp-Off history.
+              Removing staff disables login access but
+              keeps previous OT/Comp-Off history.
             </p>
           </ManagementCard>
 
@@ -1422,15 +1564,22 @@ export default function Home() {
 
             <select
               value={selectedAdminId}
-              onChange={(e) =>
-                setSelectedAdminId(e.target.value)
+              onChange={(event) =>
+                setSelectedAdminId(
+                  event.target.value
+                )
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
             >
-              <option value="">Select Admin</option>
+              <option value="">
+                Select Admin
+              </option>
 
               {admins.map((admin) => (
-                <option key={admin.id} value={admin.id}>
+                <option
+                  key={admin.id}
+                  value={admin.id}
+                >
                   {admin.employee_id} - {admin.name}
                   {admin.employee_id === MAIN_ADMIN_ID
                     ? ' (Main Admin)'
@@ -1442,7 +1591,7 @@ export default function Home() {
             <button
               onClick={removeAdmin}
               disabled={loading}
-              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5"
+              className="w-full mt-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 disabled:opacity-60"
             >
               Remove Admin
             </button>
@@ -1459,15 +1608,22 @@ export default function Home() {
 
             <select
               value={selectedAdminId}
-              onChange={(e) =>
-                setSelectedAdminId(e.target.value)
+              onChange={(event) =>
+                setSelectedAdminId(
+                  event.target.value
+                )
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
             >
-              <option value="">Select Admin</option>
+              <option value="">
+                Select Admin
+              </option>
 
               {admins.map((admin) => (
-                <option key={admin.id} value={admin.id}>
+                <option
+                  key={admin.id}
+                  value={admin.id}
+                >
                   {admin.employee_id} - {admin.name}
                 </option>
               ))}
@@ -1480,8 +1636,10 @@ export default function Home() {
             <input
               type="password"
               value={newAdminPassword}
-              onChange={(e) =>
-                setNewAdminPassword(e.target.value)
+              onChange={(event) =>
+                setNewAdminPassword(
+                  event.target.value
+                )
               }
               placeholder="Minimum 6 characters"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1494,8 +1652,10 @@ export default function Home() {
             <input
               type="password"
               value={confirmAdminPassword}
-              onChange={(e) =>
-                setConfirmAdminPassword(e.target.value)
+              onChange={(event) =>
+                setConfirmAdminPassword(
+                  event.target.value
+                )
               }
               placeholder="Confirm password"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1504,7 +1664,7 @@ export default function Home() {
             <button
               onClick={resetAdminPassword}
               disabled={loading}
-              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5"
+              className="w-full mt-5 rounded-xl bg-blue-700 text-white font-semibold py-3.5 disabled:opacity-60"
             >
               Reset Admin Password
             </button>
@@ -1536,8 +1696,10 @@ export default function Home() {
             <input
               type="password"
               value={oldPassword}
-              onChange={(e) =>
-                setOldPassword(e.target.value)
+              onChange={(event) =>
+                setOldPassword(
+                  event.target.value
+                )
               }
               placeholder="Enter old password"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1550,8 +1712,10 @@ export default function Home() {
             <input
               type="password"
               value={newPassword}
-              onChange={(e) =>
-                setNewPassword(e.target.value)
+              onChange={(event) =>
+                setNewPassword(
+                  event.target.value
+                )
               }
               placeholder="Minimum 6 characters"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1564,8 +1728,10 @@ export default function Home() {
             <input
               type="password"
               value={confirmPassword}
-              onChange={(e) =>
-                setConfirmPassword(e.target.value)
+              onChange={(event) =>
+                setConfirmPassword(
+                  event.target.value
+                )
               }
               placeholder="Confirm new password"
               className="w-full rounded-xl border border-slate-300 px-4 py-3"
@@ -1574,7 +1740,7 @@ export default function Home() {
             <button
               onClick={changeMyPassword}
               disabled={loading}
-              className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5"
+              className="w-full mt-6 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 disabled:opacity-60"
             >
               {loading
                 ? 'Changing...'
@@ -1712,7 +1878,7 @@ function AdminPageShell({
             onClick={onBack}
             className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 font-semibold text-sm"
           >
-            ← Back to Dashboard
+            Back to Dashboard
           </button>
         </div>
 
