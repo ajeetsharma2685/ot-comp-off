@@ -1,25 +1,449 @@
+```tsx
 'use client';
+
 import {useEffect,useMemo,useState} from 'react';
 import {createClient} from '@supabase/supabase-js';
-type Staff={id:number;employee_id:string;name:string;access_enabled:boolean};
-type Entry={id:number;ot_date:string;start_time:string;end_time:string;ot_hours:number;reason:string|null;comp_off_date:string|null;comp_off_status:string};
-const supabase=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
+
+type Staff={
+  id:number;
+  employee_id:string;
+  name:string;
+  access_enabled:boolean;
+};
+
+type Entry={
+  id:number;
+  ot_date:string;
+  start_time:string;
+  end_time:string;
+  ot_hours:number;
+  reason:string|null;
+  comp_off_date:string|null;
+  comp_off_status:string;
+};
+
+const supabase=createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+);
+
 export default function Home(){
- const [employeeId,setEmployeeId]=useState(''),[staff,setStaff]=useState<Staff|null>(null),[entries,setEntries]=useState<Entry[]>([]),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
- const [form,setForm]=useState({ot_date:'',start_time:'',end_time:'',reason:'',comp_off_date:''});
- useEffect(()=>{const s=localStorage.getItem('ot_staff');if(s)try{setStaff(JSON.parse(s))}catch{};ensureAnonymous()},[]);
- useEffect(()=>{if(staff)loadEntries(staff.id)},[staff]);
- async function ensureAnonymous(){const {data}=await supabase.auth.getSession();if(!data.session)await supabase.auth.signInAnonymously()}
- async function login(){setMessage('');if(!employeeId.trim())return setMessage('Employee ID enter karo.');setLoading(true);try{await ensureAnonymous();const {data,error}=await supabase.rpc('login_staff',{p_employee_id:employeeId.trim()});if(error)throw error;if(!data?.success)throw new Error(data?.message||'Employee ID authorized nahi hai.');const s={id:data.staff_id,employee_id:data.employee_id,name:data.name,access_enabled:true};localStorage.setItem('ot_staff',JSON.stringify(s));setStaff(s);setMessage('Login successful.')}catch(e:any){setMessage(e.message||'Login failed.')}finally{setLoading(false)}}
- async function loadEntries(id:number){const {data}=await supabase.from('ot_entries').select('*').eq('staff_id',id).order('ot_date',{ascending:false});if(data)setEntries(data)}
- function hours(a:string,b:string){if(!a||!b)return 0;const x=a.split(':').map(Number),y=b.split(':').map(Number);let m=y[0]*60+y[1]-x[0]*60-x[1];if(m<0)m+=1440;return Math.round(m/60*100)/100}
- async function addOT(){if(!staff)return;if(!form.ot_date||!form.start_time||!form.end_time)return setMessage('Date, Start Time aur End Time required hain.');setLoading(true);const h=hours(form.start_time,form.end_time);const {error}=await supabase.from('ot_entries').insert({staff_id:staff.id,ot_date:form.ot_date,start_time:form.start_time,end_time:form.end_time,ot_hours:h,reason:form.reason||null,comp_off_date:form.comp_off_date||null,comp_off_status:form.comp_off_date?'available':'not_set'});if(error)setMessage(error.message);else{setMessage('OT saved.');setForm({ot_date:'',start_time:'',end_time:'',reason:'',comp_off_date:''});loadEntries(staff.id)}setLoading(false)}
- async function useCompOff(id:number){const date=prompt('Comp-Off use date (YYYY-MM-DD):');if(!date)return;const {error}=await supabase.from('ot_entries').update({comp_off_status:'used',comp_off_date:date}).eq('id',id).eq('staff_id',staff!.id).eq('comp_off_status','available');setMessage(error?error.message:'Comp-Off marked Used.');if(!error)loadEntries(staff!.id)}
- function logout(){localStorage.removeItem('ot_staff');setStaff(null);setEntries([]);setEmployeeId('')}
- const total=useMemo(()=>entries.reduce((a,e)=>a+Number(e.ot_hours||0),0),[entries]);
- if(!staff)return <main className="center"><section className="card login"><div className="logo">OT</div><h1>OT & Comp-Off</h1><p className="muted">Staff Login</p><label>Employee ID</label><input value={employeeId} onChange={e=>setEmployeeId(e.target.value)} placeholder="Enter Employee ID" onKeyDown={e=>{if(e.key==='Enter')login()}}/><button onClick={login} disabled={loading}>{loading?'Checking...':'Login'}</button>{message&&<p className="msg">{message}</p>}<small>No OTP / password required.</small></section></main>;
- return <main className="page"><header className="topbar"><div><b>OT & Comp-Off</b><span> Staff Portal</span></div><button className="secondary" onClick={logout}>Logout</button></header>
- <section className="welcome"><div><p className="muted">Welcome</p><h2>{staff.name}</h2><span className="pill">{staff.employee_id}</span></div><div className="stat"><span>Total OT</span><b>{total.toFixed(2)} hrs</b></div></section>
- <section className="card"><h3>Add OT</h3><div className="grid"><div><label>OT Date</label><input type="date" value={form.ot_date} onChange={e=>setForm({...form,ot_date:e.target.value})}/></div><div><label>Start Time</label><input type="time" value={form.start_time} onChange={e=>setForm({...form,start_time:e.target.value})}/></div><div><label>End Time</label><input type="time" value={form.end_time} onChange={e=>setForm({...form,end_time:e.target.value})}/></div><div><label>Comp-Off Date</label><input type="date" value={form.comp_off_date} onChange={e=>setForm({...form,comp_off_date:e.target.value})}/></div><div className="wide"><label>Reason</label><input value={form.reason} onChange={e=>setForm({...form,reason:e.target.value})} placeholder="Reason for OT"/></div></div><div className="preview">Calculated OT: <b>{hours(form.start_time,form.end_time).toFixed(2)} hours</b></div><button onClick={addOT} disabled={loading}>{loading?'Saving...':'Save OT'}</button>{message&&<p className="msg">{message}</p>}</section>
- <section className="card"><div className="sectionHead"><h3>My OT Records</h3><span className="muted">{entries.length} records</span></div><div className="tableWrap"><table><thead><tr><th>Date</th><th>Time</th><th>Hours</th><th>Reason</th><th>Comp-Off</th><th>Status</th><th>Action</th></tr></thead><tbody>{entries.map(e=><tr key={e.id}><td>{e.ot_date}</td><td>{e.start_time} - {e.end_time}</td><td>{Number(e.ot_hours).toFixed(2)}</td><td>{e.reason||'-'}</td><td>{e.comp_off_date||'-'}</td><td><span className={'status '+e.comp_off_status}>{e.comp_off_status}</span></td><td>{e.comp_off_status==='available'?<button className="small" onClick={()=>useCompOff(e.id)}>Use Comp-Off</button>:'—'}</td></tr>)}</tbody></table></div></section></main>
-}
+  const [employeeId,setEmployeeId]=useState(''),
+    [staff,setStaff]=useState<Staff|null>(null),
+    [entries,setEntries]=useState<Entry[]>([]),
+    [loading,setLoading]=useState(false),
+    [message,setMessage]=useState('');
+
+  const [form,setForm]=useState({
+    ot_date:'',
+    start_time:'',
+    end_time:'',
+    reason:'',
+    comp_off_date:''
+  });
+
+  useEffect(()=>{
+    const s=localStorage.getItem('ot_staff');
+    if(s)try{
+      setStaff(JSON.parse(s))
+    }catch{}
+
+    ensureAnonymous()
+  },[]);
+
+  useEffect(()=>{
+    if(staff)loadEntries(staff.id)
+  },[staff]);
+
+  async function ensureAnonymous(){
+    const {data}=await supabase.auth.getSession();
+
+    if(!data.session)
+      await supabase.auth.signInAnonymously()
+  }
+
+  async function login(){
+    setMessage('');
+
+    if(!employeeId.trim())
+      return setMessage('Employee ID enter karo.');
+
+    setLoading(true);
+
+    try{
+      await ensureAnonymous();
+
+      const {data,error}=await supabase.rpc(
+        'login_staff',
+        {p_employee_id:employeeId.trim()}
+      );
+
+      if(error)throw error;
+
+      if(!data?.success)
+        throw new Error(
+          data?.message||'Employee ID authorized nahi hai.'
+        );
+
+      const s={
+        id:data.staff_id,
+        employee_id:data.employee_id,
+        name:data.name,
+        access_enabled:true
+      };
+
+      localStorage.setItem('ot_staff',JSON.stringify(s));
+      setStaff(s);
+      setMessage('Login successful.');
+
+    }catch(e:any){
+      setMessage(e.message||'Login failed.')
+    }finally{
+      setLoading(false)
+    }
+  }
+
+  async function loadEntries(id:number){
+    const {data}=await supabase
+      .from('ot_entries')
+      .select('*')
+      .eq('staff_id',id)
+      .order('ot_date',{ascending:false});
+
+    if(data)setEntries(data)
+  }
+
+  function hours(a:string,b:string){
+    if(!a||!b)return 0;
+
+    const x=a.split(':').map(Number),
+      y=b.split(':').map(Number);
+
+    let m=y[0]*60+y[1]-x[0]*60-x[1];
+
+    if(m<0)m+=1440;
+
+    return Math.round(m/60*100)/100
+  }
+
+  async function addOT(){
+    if(!staff)return;
+
+    if(!form.ot_date||!form.start_time||!form.end_time)
+      return setMessage(
+        'Date, Start Time aur End Time required hain.'
+      );
+
+    setLoading(true);
+
+    const h=hours(
+      form.start_time,
+      form.end_time
+    );
+
+    const {error}=await supabase
+      .from('ot_entries')
+      .insert({
+        staff_id:staff.id,
+        ot_date:form.ot_date,
+        start_time:form.start_time,
+        end_time:form.end_time,
+        ot_hours:h,
+        reason:form.reason||null,
+        comp_off_date:form.comp_off_date||null,
+        comp_off_status:form.comp_off_date
+          ?'available'
+          :'not_set'
+      });
+
+    if(error){
+      setMessage(error.message);
+    }else{
+      setMessage('OT saved.');
+
+      setForm({
+        ot_date:'',
+        start_time:'',
+        end_time:'',
+        reason:'',
+        comp_off_date:''
+      });
+
+      loadEntries(staff.id)
+    }
+
+    setLoading(false)
+  }
+
+  async function useCompOff(id:number){
+    const date=prompt(
+      'Comp-Off use date (YYYY-MM-DD):'
+    );
+
+    if(!date)return;
+
+    const {error}=await supabase
+      .from('ot_entries')
+      .update({
+        comp_off_status:'used',
+        comp_off_date:date
+      })
+      .eq('id',id)
+      .eq('staff_id',staff!.id)
+      .eq('comp_off_status','available');
+
+    setMessage(
+      error
+        ?error.message
+        :'Comp-Off marked Used.'
+    );
+
+    if(!error)
+      loadEntries(staff!.id)
+  }
+
+  function logout(){
+    localStorage.removeItem('ot_staff');
+    setStaff(null);
+    setEntries([]);
+    setEmployeeId('')
+  }
+
+  const total=useMemo(
+    ()=>entries.reduce(
+      (a,e)=>a+Number(e.ot_hours||0),
+      0
+    ),
+    [entries]
+  );
+
+  if(!staff)
+    return (
+      <main className="center">
+        <section className="card login">
+          <div className="logo">OT</div>
+
+          <h1>OT & Comp-Off</h1>
+
+          <p className="muted">
+            Staff Login
+          </p>
+
+          <label>
+            Employee ID
+          </label>
+
+          <input
+            value={employeeId}
+            onChange={e=>setEmployeeId(e.target.value)}
+            placeholder="Enter Employee ID"
+            onKeyDown={e=>{
+              if(e.key==='Enter')login()
+            }}
+          />
+
+          <button
+            onClick={login}
+            disabled={loading}
+          >
+            {loading?'Checking...':'Login'}
+          </button>
+
+          {message&&
+            <p className="msg">
+              {message}
+            </p>
+          }
+
+          <small>
+            No OTP / password required.
+          </small>
+        </section>
+      </main>
+    );
+
+  return (
+    <main className="page">
+
+      <header className="topbar">
+        <div>
+          <b>OT & Comp-Off</b>
+          <span> Staff Portal</span>
+        </div>
+
+        <button
+          className="secondary"
+          onClick={logout}
+        >
+          Logout
+        </button>
+      </header>
+
+      <section className="welcome">
+        <div>
+          <p className="muted">
+            Welcome
+          </p>
+
+          <h2>
+            {staff.name}
+          </h2>
+
+          <span className="pill">
+            {staff.employee_id}
+          </span>
+        </div>
+
+        <div className="stat">
+          <span>
+            Total OT
+          </span>
+
+          <b>
+            {total.toFixed(2)} hrs
+          </b>
+        </div>
+      </section>
+
+      <section className="card">
+
+        <h3>
+          Add OT
+        </h3>
+
+        <div className="grid">
+
+          <div>
+            <label>
+              OT Date
+            </label>
+
+            <input
+              type="date"
+              value={form.ot_date}
+              onChange={e=>
+                setForm({
+                  ...form,
+                  ot_date:e.target.value
+                })
+              }
+            />
+          </div>
+
+          <div>
+            <label>
+              Start Time
+            </label>
+
+            <input
+              type="time"
+              value={form.start_time}
+              onChange={e=>
+                setForm({
+                  ...form,
+                  start_time:e.target.value
+                })
+              }
+            />
+          </div>
+
+          <div>
+            <label>
+              End Time
+            </label>
+
+            <input
+              type="time"
+              value={form.end_time}
+              onChange={e=>
+                setForm({
+                  ...form,
+                  end_time:e.target.value
+                })
+              }
+            />
+          </div>
+
+          <div>
+            <label>
+              Comp-Off Date
+            </label>
+
+            <input
+              type="date"
+              value={form.comp_off_date}
+              onChange={e=>
+                setForm({
+                  ...form,
+                  comp_off_date:e.target.value
+                })
+              }
+            />
+          </div>
+
+          <div className="wide">
+            <label>
+              Reason
+            </label>
+
+            <input
+              value={form.reason}
+              onChange={e=>
+                setForm({
+                  ...form,
+                  reason:e.target.value
+                })
+              }
+              placeholder="Reason for OT"
+            />
+          </div>
+
+        </div>
+
+        <div className="preview">
+          Calculated OT:
+          <b>
+            {hours(
+              form.start_time,
+              form.end_time
+            ).toFixed(2)} hours
+          </b>
+        </div>
+
+        <button
+          onClick={addOT}
+          disabled={loading}
+        >
+          {loading?'Saving...':'Save OT'}
+        </button>
+
+        {message&&
+          <p className="msg">
+            {message}
+          </p>
+        }
+
+      </section>
+
+      <section className="card">
+
+        <div className="sectionHead">
+
+          <h3>
+            My OT Records
+          </h3>
+
+          <span className="muted">
+            {entries.length} records
+          </span>
+
+        </div>
+
+        <div className="tableWrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>
