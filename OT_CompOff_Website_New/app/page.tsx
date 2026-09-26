@@ -8,3423 +8,2113 @@ type Staff = {
   employee_id: string;
   name: string;
   access_enabled: boolean;
-  role: string;
+  role?: string;
 };
 
 type Entry = {
   id: number;
-  ot_date: string;
-  start_time: string;
-  end_time: string;
-  ot_hours: number;
-  reason: string | null;
-  comp_off_date: string | null;
-  comp_off_status: string | null;
-};
-
-type AdminStaff = {
-  id: number;
-  employee_id: string;
-  name: string;
-  access_enabled: boolean;
-  role: string;
-};
-
-type AdminOT = {
-  id: number;
   employee_id: string;
   name: string;
   ot_date: string;
-  start_time: string;
-  end_time: string;
   ot_hours: number;
-  reason: string | null;
-  comp_off_date: string | null;
-  comp_off_status: string | null;
+  comp_off: boolean;
+  created_at?: string;
 };
 
-type AdminSection =
-  | 'dashboard'
-  | 'staff'
-  | 'add'
-  | 'ot'
-  | 'management';
+type AdminStaff = Staff & {
+  role: 'admin';
+};
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 );
 
-export default function Home() {
-  /* =====================================================
-     LOGIN
-     ===================================================== */
+const MAIN_ADMIN_ID = 'SAS102';
+const STORAGE_KEY = 'ot_staff';
 
-  const [employeeId, setEmployeeId] = useState('');
+export default function Home() {
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const [employeeId, setEmployeeId] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [adminLoginMode, setAdminLoginMode] = useState(false);
-  const [adminEmployeeId, setAdminEmployeeId] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const [adminSection, setAdminSection] = useState<
+    'dashboard' | 'staff' | 'add' | 'ot' | 'management' | 'password'
+  >('dashboard');
 
-  /* =====================================================
-     ADMIN DATA
-     ===================================================== */
-
-  const [adminStaff, setAdminStaff] = useState<AdminStaff[]>([]);
-  const [adminOT, setAdminOT] = useState<AdminOT[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [adminList, setAdminList] = useState<AdminStaff[]>([]);
-
-  const [newEmployeeId, setNewEmployeeId] = useState('');
-  const [newEmployeeName, setNewEmployeeName] = useState('');
-
-  const [adminLoading, setAdminLoading] = useState(false);
-
-  const [adminSection, setAdminSection] =
-    useState<AdminSection>('dashboard');
-
-  /* =====================================================
-     EDIT STAFF
-     ===================================================== */
-
-  const [editingStaffId, setEditingStaffId] =
-    useState<number | null>(null);
-
-  const [editingEmployeeId, setEditingEmployeeId] =
-    useState('');
-
-  const [editingName, setEditingName] =
-    useState('');
-
-  /* =====================================================
-     OT FORM
-     ===================================================== */
-
-  const [form, setForm] = useState({
-    ot_date: '',
-    start_time: '',
-    end_time: '',
-    reason: ''
-  });
-
-  /* =====================================================
-     COMP OFF
-     ===================================================== */
-
-  const [compOffEntryId, setCompOffEntryId] =
-    useState<number | null>(null);
-
-  const [compOffDate, setCompOffDate] =
-    useState('');
-
-  /* =====================================================
-     ADMIN MANAGEMENT
-     ===================================================== */
-
-  const [selectedMakeAdminStaffId, setSelectedMakeAdminStaffId] =
-    useState('');
-
-  const [makeAdminPassword, setMakeAdminPassword] =
-    useState('');
-
-  const [makeAdminConfirmPassword, setMakeAdminConfirmPassword] =
-    useState('');
-
-  const [selectedRemoveAdminId, setSelectedRemoveAdminId] =
-    useState('');
-
-  const [selectedRemoveStaffId, setSelectedRemoveStaffId] =
-    useState('');
-
-  const [selectedResetAdminId, setSelectedResetAdminId] =
-    useState('');
-
-  const [resetAdminPassword, setResetAdminPassword] =
-    useState('');
-
-  const [resetAdminConfirmPassword, setResetAdminConfirmPassword] =
-    useState('');
-
-  const [oldPassword, setOldPassword] =
-    useState('');
-
-  const [newPassword, setNewPassword] =
-    useState('');
-
-  const [confirmPassword, setConfirmPassword] =
-    useState('');
-
-  /* =====================================================
-     OT FILTER
-     ===================================================== */
+  const [otRecords, setOtRecords] = useState<Entry[]>([]);
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
-  /* =====================================================
-     INITIAL LOAD
-     ===================================================== */
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [newName, setNewName] = useState('');
+
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [selectedAdmin, setSelectedAdmin] = useState('');
+
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+
+  const [oldPassword, setOldPassword] = useState('');
+  const [myNewPassword, setMyNewPassword] = useState('');
+  const [confirmMyNewPassword, setConfirmMyNewPassword] = useState('');
+
+  const isAdmin = staff?.role === 'admin';
 
   useEffect(() => {
-    const savedStaff = localStorage.getItem('ot_staff');
+    const saved = localStorage.getItem(STORAGE_KEY);
 
-    if (savedStaff) {
+    if (saved) {
       try {
-        setStaff(JSON.parse(savedStaff));
+        setStaff(JSON.parse(saved));
       } catch {
-        localStorage.removeItem('ot_staff');
+        localStorage.removeItem(STORAGE_KEY);
       }
     }
-
-    ensureAnonymous();
   }, []);
 
-  useEffect(() => {
-    if (staff && staff.role !== 'admin') {
-      loadEntries(staff.id);
-    }
+  const saveSession = (data: Staff) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    setStaff(data);
+  };
 
-    if (staff?.role === 'admin') {
-      loadAdminData();
-    }
-  }, [staff]);
-
-  /* =====================================================
-     ANONYMOUS SESSION
-     ===================================================== */
-
-  async function ensureAnonymous() {
-    const { data } = await supabase.auth.getSession();
-
-    if (!data.session) {
-      await supabase.auth.signInAnonymously();
-    }
-  }
-
-  /* =====================================================
-     STAFF LOGIN
-     ===================================================== */
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setStaff(null);
+    setAdminSection('dashboard');
+    setMessage('');
+    setPassword('');
+  };
 
   async function login() {
-    setMessage('');
-
     if (!employeeId.trim()) {
-      setMessage('Employee ID enter karo.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await ensureAnonymous();
-
-      const { data, error } =
-        await supabase.rpc('login_staff', {
-          p_employee_id: employeeId.trim()
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-            'Employee ID authorized nahi hai.'
-        );
-      }
-
-      const loggedInStaff: Staff = {
-        id: data.staff_id,
-        employee_id: data.employee_id,
-        name: data.name,
-        access_enabled: true,
-        role: data.role
-      };
-
-      localStorage.setItem(
-        'ot_staff',
-        JSON.stringify(loggedInStaff)
-      );
-
-      setStaff(loggedInStaff);
-      setMessage('Login successful.');
-    } catch (error: any) {
-      setMessage(
-        error.message || 'Login failed.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /* =====================================================
-     ADMIN LOGIN
-     ===================================================== */
-
-  async function adminLogin() {
-    setMessage('');
-
-    if (!adminEmployeeId.trim()) {
-      setMessage(
-        'Admin Employee ID enter karo.'
-      );
-      return;
-    }
-
-    if (!adminPassword) {
-      setMessage(
-        'Admin Password enter karo.'
-      );
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await ensureAnonymous();
-
-      const { data, error } =
-        await supabase.rpc('admin_login', {
-          p_employee_id:
-            adminEmployeeId.trim(),
-          p_password: adminPassword
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-            'Admin login failed.'
-        );
-      }
-
-      const loggedInAdmin: Staff = {
-        id: data.staff_id,
-        employee_id: data.employee_id,
-        name: data.name,
-        access_enabled: true,
-        role: data.role
-      };
-
-      localStorage.setItem(
-        'ot_staff',
-        JSON.stringify(loggedInAdmin)
-      );
-
-      setStaff(loggedInAdmin);
-
-      setAdminEmployeeId('');
-      setAdminPassword('');
-
-      setMessage(
-        'Admin login successful.'
-      );
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Admin login failed.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /* =====================================================
-     STAFF OT LOAD
-     ===================================================== */
-
-  async function loadEntries(id: number) {
-    const { data, error } =
-      await supabase
-        .from('ot_entries')
-        .select('*')
-        .eq('staff_id', id)
-        .order('ot_date', {
-          ascending: false
-        });
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    if (data) {
-      setEntries(data as Entry[]);
-    }
-  }
-
-  /* =====================================================
-     ADMIN DATA LOAD
-     ===================================================== */
-
-  async function loadAdminData() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    setAdminLoading(true);
-
-    try {
-      const [
-        staffResult,
-        otResult,
-        adminResult
-      ] = await Promise.all([
-        supabase.rpc(
-          'admin_get_staff',
-          {
-            p_admin_employee_id:
-              staff.employee_id
-          }
-        ),
-
-        supabase.rpc(
-          'admin_get_all_ot',
-          {
-            p_admin_employee_id:
-              staff.employee_id
-          }
-        ),
-
-        supabase.rpc(
-          'admin_get_admins',
-          {
-            p_admin_employee_id:
-              staff.employee_id
-          }
-        )
-      ]);
-
-      if (staffResult.error) {
-        throw staffResult.error;
-      }
-
-      if (otResult.error) {
-        throw otResult.error;
-      }
-
-      if (adminResult.error) {
-        throw adminResult.error;
-      }
-
-      const staffData =
-        Array.isArray(staffResult.data)
-          ? staffResult.data
-          : [];
-
-      const otData =
-        Array.isArray(otResult.data)
-          ? otResult.data
-          : [];
-
-      const adminResponse =
-        adminResult.data;
-
-      const admins =
-        Array.isArray(
-          adminResponse?.admins
-        )
-          ? adminResponse.admins
-          : [];
-
-      setAdminStaff(
-        staffData as AdminStaff[]
-      );
-
-      setAdminOT(
-        otData as AdminOT[]
-      );
-
-      setAdminList(
-        admins as AdminStaff[]
-      );
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Admin data load nahi ho raha.'
-      );
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  /* =====================================================
-     CALCULATE OT HOURS
-     ===================================================== */
-
-  function calculateHours(
-    start: string,
-    end: string
-  ) {
-    if (!start || !end) {
-      return 0;
-    }
-
-    const startParts =
-      start.split(':').map(Number);
-
-    const endParts =
-      end.split(':').map(Number);
-
-    let minutes =
-      endParts[0] * 60 +
-      endParts[1] -
-      startParts[0] * 60 -
-      startParts[1];
-
-    if (minutes < 0) {
-      minutes += 1440;
-    }
-
-    return Math.round(
-      (minutes / 60) * 100
-    ) / 100;
-  }
-
-  /* =====================================================
-     ADD OT
-     ===================================================== */
-
-  async function addOT() {
-    if (!staff) {
-      return;
-    }
-
-    if (
-      !form.ot_date ||
-      !form.start_time ||
-      !form.end_time
-    ) {
-      setMessage(
-        'Date, Start Time aur End Time required hain.'
-      );
+      setMessage('Employee ID required');
       return;
     }
 
     setLoading(true);
     setMessage('');
 
-    const otHours =
-      calculateHours(
-        form.start_time,
-        form.end_time
-      );
-
-    const { error } =
-      await supabase
-        .from('ot_entries')
-        .insert({
-          staff_id: staff.id,
-          ot_date: form.ot_date,
-          start_time:
-            form.start_time,
-          end_time:
-            form.end_time,
-          ot_hours: otHours,
-          reason:
-            form.reason || null,
-          comp_off_date: null,
-          comp_off_status: null
+    try {
+      if (password.trim()) {
+        const { data, error } = await supabase.rpc('admin_login', {
+          p_employee_id: employeeId.trim(),
+          p_password: password,
         });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage('OT saved.');
+        if (error) throw error;
 
-      setForm({
-        ot_date: '',
-        start_time: '',
-        end_time: '',
-        reason: ''
+        if (!data?.success) {
+          setMessage(data?.message || 'Admin login failed');
+          return;
+        }
+
+        const adminData: Staff = {
+          id: data.staff_id,
+          employee_id: data.employee_id,
+          name: data.name,
+          access_enabled: true,
+          role: 'admin',
+        };
+
+        saveSession(adminData);
+        setPassword('');
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('login_staff', {
+        p_employee_id: employeeId.trim(),
       });
 
-      await loadEntries(staff.id);
+      if (error) throw error;
+
+      if (!data?.success) {
+        setMessage(data?.message || 'Employee not authorized');
+        return;
+      }
+
+      const staffData: Staff = {
+        id: data.staff_id,
+        employee_id: data.employee_id,
+        name: data.name,
+        access_enabled: data.access_enabled ?? true,
+        role: data.role ?? 'staff',
+      };
+
+      saveSession(staffData);
+    } catch (err: any) {
+      setMessage(err?.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
-  /* =====================================================
-     COMP OFF
-     ===================================================== */
+  async function loadStaff() {
+    if (!staff?.employee_id) return;
 
-  function openCompOff(
-    entryId: number
-  ) {
-    setCompOffEntryId(entryId);
-    setCompOffDate('');
-    setMessage('');
-  }
+    const { data, error } = await supabase.rpc('admin_get_staff', {
+      p_admin_employee_id: staff.employee_id,
+    });
 
-  function cancelCompOff() {
-    setCompOffEntryId(null);
-    setCompOffDate('');
-  }
-
-  async function confirmCompOff() {
-    if (
-      !staff ||
-      !compOffEntryId
-    ) {
+    if (error) {
+      setMessage(error.message);
       return;
     }
 
-    if (!compOffDate) {
-      setMessage(
-        'Please select Comp-Off date.'
-      );
+    if (data?.success) {
+      setStaffList(data.staff || []);
+    } else {
+      setMessage(data?.message || 'Unable to load staff');
+    }
+  }
+
+  async function loadAdmins() {
+    if (!staff?.employee_id) return;
+
+    const { data, error } = await supabase.rpc('admin_get_admins', {
+      p_admin_employee_id: staff.employee_id,
+    });
+
+    if (error) {
+      setMessage(error.message);
       return;
     }
+
+    if (data?.success) {
+      setAdminList(data.admins || []);
+    } else {
+      setMessage(data?.message || 'Unable to load admins');
+    }
+  }
+
+  async function loadOT() {
+    if (!staff?.employee_id) return;
+
+    const { data, error } = await supabase.rpc('admin_get_all_ot', {
+      p_admin_employee_id: staff.employee_id,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    if (data?.success) {
+      setOtRecords(data.records || []);
+    } else {
+      setMessage(data?.message || 'Unable to load OT records');
+    }
+  }
+
+  async function addEmployee() {
+    if (!newEmployeeId.trim() || !newName.trim()) {
+      setMessage('Employee ID and Name required');
+      return;
+    }
+
+    if (!staff?.employee_id) return;
 
     setLoading(true);
     setMessage('');
 
-    const { error } =
-      await supabase
-        .from('ot_entries')
-        .update({
-          comp_off_date:
-            compOffDate,
-          comp_off_status:
-            'Comp-Off Used'
-        })
-        .eq(
-          'id',
-          compOffEntryId
-        )
-        .eq(
-          'staff_id',
-          staff.id
-        )
-        .is(
-          'comp_off_date',
-          null
-        );
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage(
-        'Comp-Off Used successfully.'
-      );
-
-      setCompOffEntryId(null);
-      setCompOffDate('');
-
-      await loadEntries(staff.id);
-    }
-
-    setLoading(false);
-  }
-
-  /* =====================================================
-     ADD EMPLOYEE
-     ===================================================== */
-
-  async function addEmployee() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    if (!newEmployeeId.trim()) {
-      setMessage(
-        'Employee ID enter karo.'
-      );
-      return;
-    }
-
-    if (!newEmployeeName.trim()) {
-      setMessage(
-        'Employee Name enter karo.'
-      );
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
-
     try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_add_staff',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-            p_employee_id:
-              newEmployeeId.trim(),
-            p_name:
-              newEmployeeName.trim()
-          }
-        );
+      const { data, error } = await supabase.rpc('admin_add_staff', {
+        p_admin_employee_id: staff.employee_id,
+        p_employee_id: newEmployeeId.trim(),
+        p_name: newName.trim(),
+      });
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+
+      setMessage(data?.message || 'Employee added successfully');
+
+      if (data?.success) {
+        setNewEmployeeId('');
+        setNewName('');
+        await loadStaff();
       }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Employee add nahi hua.'
-        );
-      }
-
-      setNewEmployeeId('');
-      setNewEmployeeName('');
-
-      setMessage(
-        'Employee successfully added.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Employee add nahi hua.'
-      );
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to add employee');
     } finally {
-      setAdminLoading(false);
+      setLoading(false);
     }
   }
-
-  /* =====================================================
-     EDIT STAFF
-     ===================================================== */
-
-  function startEdit(
-    employee: AdminStaff
-  ) {
-    setEditingStaffId(
-      employee.id
-    );
-
-    setEditingEmployeeId(
-      employee.employee_id
-    );
-
-    setEditingName(
-      employee.name
-    );
-
-    setMessage('');
-  }
-
-  function cancelEdit() {
-    setEditingStaffId(null);
-    setEditingEmployeeId('');
-    setEditingName('');
-  }
-
-  async function saveEdit() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    if (!editingStaffId) {
-      return;
-    }
-
-    if (!editingEmployeeId.trim()) {
-      setMessage(
-        'Employee ID required hai.'
-      );
-      return;
-    }
-
-    if (!editingName.trim()) {
-      setMessage(
-        'Employee Name required hai.'
-      );
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
-
-    try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_update_staff',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-            p_staff_id:
-              editingStaffId,
-            p_employee_id:
-              editingEmployeeId.trim(),
-            p_name:
-              editingName.trim()
-          }
-        );
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Employee details update nahi hue.'
-        );
-      }
-
-      cancelEdit();
-
-      setMessage(
-        'Employee details updated successfully.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Employee details update nahi hue.'
-      );
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  /* =====================================================
-     ENABLE / DISABLE STAFF
-     ===================================================== */
-
-  async function toggleEmployee(
-    staffId: number,
-    enabled: boolean
-  ) {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
-
-    try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_toggle_staff',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-            p_staff_id: staffId,
-            p_enabled: enabled
-          }
-        );
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Employee status change nahi hua.'
-        );
-      }
-
-      setMessage(
-        enabled
-          ? 'Employee enabled.'
-          : 'Employee disabled.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Employee status change nahi hua.'
-      );
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  /* =====================================================
-     MAKE ADMIN
-     ===================================================== */
-
-  async function makeAdmin() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    if (!selectedMakeAdminStaffId) {
-      setMessage(
-        'Staff select karo.'
-      );
-      return;
-    }
-
-    if (!makeAdminPassword) {
-      setMessage(
-        'New Admin Password enter karo.'
-      );
-      return;
-    }
-
-    if (!makeAdminConfirmPassword) {
-      setMessage(
-        'Confirm Password enter karo.'
-      );
-      return;
-    }
-
-    if (
-      makeAdminPassword !==
-      makeAdminConfirmPassword
-    ) {
-      setMessage(
-        'Password match nahi kar raha.'
-      );
-      return;
-    }
-
-    if (
-      makeAdminPassword.length < 6
-    ) {
-      setMessage(
-        'Password minimum 6 characters ka hona chahiye.'
-      );
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
-
-    try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_make_admin',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-
-            p_staff_id:
-              Number(
-                selectedMakeAdminStaffId
-              ),
-
-            p_new_password:
-              makeAdminPassword,
-
-            p_confirm_password:
-              makeAdminConfirmPassword
-          }
-        );
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Make Admin failed.'
-        );
-      }
-
-      setSelectedMakeAdminStaffId('');
-      setMakeAdminPassword('');
-      setMakeAdminConfirmPassword('');
-
-      setMessage(
-        'Employee is now an Admin successfully.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Make Admin failed.'
-      );
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  /* =====================================================
-     REMOVE ADMIN
-     ===================================================== */
-
-  async function removeAdmin() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
-
-    if (!selectedRemoveAdminId) {
-      setMessage(
-        'Admin select karo.'
-      );
-      return;
-    }
-
-    const selectedAdmin =
-      adminList.find(
-        (item) =>
-          item.id ===
-          Number(
-            selectedRemoveAdminId
-          )
-      );
-
-    if (
-      selectedAdmin &&
-      selectedAdmin.employee_id
-        .trim()
-        .toUpperCase() ===
-        'SAS102'
-    ) {
-      setMessage(
-        'Main Admin SAS102 ko remove nahi kiya ja sakta.'
-      );
-      return;
-    }
-
-    if (
-      !window.confirm(
-        'Kya aap selected Admin ko remove karna chahte ho?'
-      )
-    ) {
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
-
-    try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_remove_admin',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-
-            p_target_admin_id:
-              Number(
-                selectedRemoveAdminId
-              )
-          }
-        );
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Admin remove nahi hua.'
-        );
-      }
-
-      setSelectedRemoveAdminId('');
-
-      setMessage(
-        'Admin removed successfully.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Admin remove nahi hua.'
-      );
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  /* =====================================================
-     REMOVE STAFF
-     ===================================================== */
 
   async function removeStaff() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
+    if (!selectedStaff || !staff?.employee_id) {
+      setMessage('Select a staff member');
       return;
     }
 
-    if (!selectedRemoveStaffId) {
-      setMessage(
-        'Staff select karo.'
-      );
+    const selected = staffList.find(
+      x => String(x.id) === String(selectedStaff)
+    );
+
+    if (!selected) return;
+
+    if (!confirm(`Remove ${selected.name} (${selected.employee_id})?`)) {
       return;
     }
 
-    const selected =
-      adminStaff.find(
-        (item) =>
-          item.id ===
-          Number(
-            selectedRemoveStaffId
-          )
-      );
-
-    if (
-      selected &&
-      selected.employee_id
-        .trim()
-        .toUpperCase() ===
-        'SAS102'
-    ) {
-      setMessage(
-        'Main Admin SAS102 ko remove nahi kiya ja sakta.'
-      );
-      return;
-    }
-
-    if (
-      selected &&
-      selected.role === 'admin'
-    ) {
-      setMessage(
-        'Admin account ke liye Remove Admin use karo.'
-      );
-      return;
-    }
-
-    if (
-      !window.confirm(
-        'Kya aap selected Staff ko remove karna chahte ho? OT/Comp-Off history preserve rahegi.'
-      )
-    ) {
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
+    setLoading(true);
 
     try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_remove_staff',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
+      const { data, error } = await supabase.rpc('admin_remove_staff', {
+        p_admin_employee_id: staff.employee_id,
+        p_staff_id: Number(selectedStaff),
+      });
 
-            p_staff_id:
-              Number(
-                selectedRemoveStaffId
-              )
-          }
-        );
+      if (error) throw error;
 
-      if (error) {
-        throw error;
+      setMessage(data?.message || 'Staff removed');
+
+      if (data?.success) {
+        setSelectedStaff('');
+        await loadStaff();
       }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Staff remove nahi hua.'
-        );
-      }
-
-      setSelectedRemoveStaffId('');
-
-      setMessage(
-        'Staff removed successfully. OT/Comp-Off history preserved.'
-      );
-
-      await loadAdminData();
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Staff remove nahi hua.'
-      );
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to remove staff');
     } finally {
-      setAdminLoading(false);
+      setLoading(false);
     }
   }
 
-  /* =====================================================
-     RESET ADMIN PASSWORD
-     ===================================================== */
-
-  async function resetAdminPasswordFn() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
+  async function makeAdmin() {
+    if (!selectedStaff) {
+      setMessage('Select an employee');
       return;
     }
 
-    if (!selectedResetAdminId) {
-      setMessage(
-        'Admin select karo.'
-      );
+    if (!newAdminPassword || !confirmAdminPassword) {
+      setMessage('New admin password and confirm password are required');
       return;
     }
 
-    if (!resetAdminPassword) {
-      setMessage(
-        'New password enter karo.'
-      );
+    if (newAdminPassword !== confirmAdminPassword) {
+      setMessage('Passwords do not match');
       return;
     }
 
-    if (!resetAdminConfirmPassword) {
-      setMessage(
-        'Confirm password enter karo.'
-      );
+    if (newAdminPassword.length < 6) {
+      setMessage('Password must be at least 6 characters');
       return;
     }
 
-    if (
-      resetAdminPassword !==
-      resetAdminConfirmPassword
-    ) {
-      setMessage(
-        'Password match nahi kar raha.'
-      );
-      return;
-    }
+    if (!staff?.employee_id) return;
 
-    if (
-      resetAdminPassword.length < 6
-    ) {
-      setMessage(
-        'Password minimum 6 characters ka hona chahiye.'
-      );
-      return;
-    }
-
-    setAdminLoading(true);
-    setMessage('');
+    setLoading(true);
 
     try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_reset_admin_password',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
+      const { data, error } = await supabase.rpc('admin_make_admin', {
+        p_admin_employee_id: staff.employee_id,
+        p_staff_id: Number(selectedStaff),
+        p_new_password: newAdminPassword,
+        p_confirm_password: confirmAdminPassword,
+      });
 
-            p_target_admin_id:
-              Number(
-                selectedResetAdminId
-              ),
+      if (error) throw error;
 
-            p_new_password:
-              resetAdminPassword,
+      setMessage(data?.message || 'Employee is now admin');
 
-            p_confirm_password:
-              resetAdminConfirmPassword
-          }
-        );
-
-      if (error) {
-        throw error;
+      if (data?.success) {
+        setSelectedStaff('');
+        setNewAdminPassword('');
+        setConfirmAdminPassword('');
+        await loadStaff();
+        await loadAdmins();
       }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Password reset failed.'
-        );
-      }
-
-      setSelectedResetAdminId('');
-      setResetAdminPassword('');
-      setResetAdminConfirmPassword('');
-
-      setMessage(
-        'Admin password reset successfully.'
-      );
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Password reset failed.'
-      );
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to make admin');
     } finally {
-      setAdminLoading(false);
+      setLoading(false);
     }
   }
 
-  /* =====================================================
-     CHANGE MY PASSWORD
-     ===================================================== */
+  async function removeAdmin() {
+    if (!selectedAdmin || !staff?.employee_id) {
+      setMessage('Select an admin');
+      return;
+    }
+
+    const target = adminList.find(
+      x => String(x.id) === String(selectedAdmin)
+    );
+
+    if (!target) return;
+
+    if (target.employee_id.toUpperCase() === MAIN_ADMIN_ID) {
+      setMessage('Main Admin cannot be removed');
+      return;
+    }
+
+    if (!confirm(`Remove admin access from ${target.name}?`)) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc('admin_remove_admin', {
+        p_admin_employee_id: staff.employee_id,
+        p_target_admin_id: Number(selectedAdmin),
+      });
+
+      if (error) throw error;
+
+      setMessage(data?.message || 'Admin removed');
+
+      if (data?.success) {
+        setSelectedAdmin('');
+        await loadAdmins();
+        await loadStaff();
+      }
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to remove admin');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resetAdminPassword() {
+    if (!selectedAdmin) {
+      setMessage('Select an admin');
+      return;
+    }
+
+    if (!newAdminPassword || !confirmAdminPassword) {
+      setMessage('New password and confirm password are required');
+      return;
+    }
+
+    if (newAdminPassword !== confirmAdminPassword) {
+      setMessage('Passwords do not match');
+      return;
+    }
+
+    if (newAdminPassword.length < 6) {
+      setMessage('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!staff?.employee_id) return;
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'admin_reset_admin_password',
+        {
+          p_admin_employee_id: staff.employee_id,
+          p_target_admin_id: Number(selectedAdmin),
+          p_new_password: newAdminPassword,
+          p_confirm_password: confirmAdminPassword,
+        }
+      );
+
+      if (error) throw error;
+
+      setMessage(data?.message || 'Admin password reset');
+
+      if (data?.success) {
+        setSelectedAdmin('');
+        setNewAdminPassword('');
+        setConfirmAdminPassword('');
+      }
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to reset password');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function changeMyPassword() {
-    if (
-      !staff ||
-      staff.role !== 'admin'
-    ) {
-      return;
-    }
+    if (!staff?.employee_id) return;
 
     if (!oldPassword) {
-      setMessage(
-        'Old password enter karo.'
-      );
+      setMessage('Old password is required');
       return;
     }
 
-    if (!newPassword) {
-      setMessage(
-        'New password enter karo.'
-      );
+    if (!myNewPassword) {
+      setMessage('New password is required');
       return;
     }
 
-    if (!confirmPassword) {
-      setMessage(
-        'Confirm password enter karo.'
-      );
+    if (!confirmMyNewPassword) {
+      setMessage('Confirm password is required');
       return;
     }
 
-    if (
-      newPassword !==
-      confirmPassword
-    ) {
-      setMessage(
-        'New password aur confirm password match nahi kar raha.'
-      );
+    if (myNewPassword !== confirmMyNewPassword) {
+      setMessage('New passwords do not match');
       return;
     }
 
-    if (newPassword.length < 6) {
-      setMessage(
-        'Password minimum 6 characters ka hona chahiye.'
-      );
+    if (myNewPassword.length < 6) {
+      setMessage('Password must be at least 6 characters');
       return;
     }
 
-    setAdminLoading(true);
-    setMessage('');
+    setLoading(true);
 
     try {
-      const { data, error } =
-        await supabase.rpc(
-          'admin_change_password',
-          {
-            p_admin_employee_id:
-              staff.employee_id,
-
-            p_old_password:
-              oldPassword,
-
-            p_new_password:
-              newPassword,
-
-            p_confirm_password:
-              confirmPassword
-          }
-        );
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.success === false) {
-        throw new Error(
-          data?.message ||
-            'Password change failed.'
-        );
-      }
-
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-
-      setMessage(
-        'Password changed successfully.'
+      const { data, error } = await supabase.rpc(
+        'admin_change_password',
+        {
+          p_admin_employee_id: staff.employee_id,
+          p_old_password: oldPassword,
+          p_new_password: myNewPassword,
+          p_confirm_password: confirmMyNewPassword,
+        }
       );
-    } catch (error: any) {
-      setMessage(
-        error.message ||
-          'Password change failed.'
-      );
+
+      if (error) throw error;
+
+      setMessage(data?.message || 'Password changed');
+
+      if (data?.success) {
+        setOldPassword('');
+        setMyNewPassword('');
+        setConfirmMyNewPassword('');
+      }
+    } catch (err: any) {
+      setMessage(err?.message || 'Unable to change password');
     } finally {
-      setAdminLoading(false);
+      setLoading(false);
     }
   }
 
-  /* =====================================================
-     FILTERED OT
-     ===================================================== */
+  const filteredOT = useMemo(() => {
+    return otRecords.filter(row => {
+      if (fromDate && row.ot_date < fromDate) return false;
+      if (toDate && row.ot_date > toDate) return false;
+      return true;
+    });
+  }, [otRecords, fromDate, toDate]);
 
-  const filteredAdminOT =
-    useMemo(() => {
-      return adminOT.filter(
-        (entry) => {
-          if (
-            fromDate &&
-            entry.ot_date < fromDate
-          ) {
-            return false;
-          }
+  const totalHours = useMemo(() => {
+    return filteredOT.reduce(
+      (sum, row) => sum + Number(row.ot_hours || 0),
+      0
+    );
+  }, [filteredOT]);
 
-          if (
-            toDate &&
-            entry.ot_date > toDate
-          ) {
-            return false;
-          }
-
-          return true;
-        }
-      );
-    }, [
-      adminOT,
-      fromDate,
-      toDate
-    ]);
-
-  /* =====================================================
-     TOTAL OT
-     ===================================================== */
-
-  const total =
-    useMemo(() => {
-      return entries.reduce(
-        (sum, entry) =>
-          sum +
-          Number(
-            entry.ot_hours || 0
-          ),
-        0
-      );
-    }, [entries]);
-
-  const adminTotalOT =
-    useMemo(() => {
-      return filteredAdminOT.reduce(
-        (sum, entry) =>
-          sum +
-          Number(
-            entry.ot_hours || 0
-          ),
-        0
-      );
-    }, [filteredAdminOT]);
-
-  /* =====================================================
-     DOWNLOAD EXCEL
-     ===================================================== */
-
-  function downloadOTExcel() {
-    if (
-      filteredAdminOT.length === 0
-    ) {
-      setMessage(
-        'Download ke liye OT records nahi hain.'
-      );
+  function downloadCSV() {
+    if (!filteredOT.length) {
+      setMessage('No OT records available for download');
       return;
     }
 
-    const headers = [
+    const header = [
       'Employee ID',
-      'Employee Name',
+      'Name',
       'OT Date',
-      'Start Time',
-      'End Time',
       'OT Hours',
-      'Reason',
-      'Comp-Off Date',
-      'Comp-Off Status'
+      'Comp Off',
     ];
 
-    const escapeCSV = (
-      value: any
-    ) => {
-      const text =
-        value === null ||
-        value === undefined
-          ? ''
-          : String(value);
+    const rows = filteredOT.map(row => [
+      row.employee_id,
+      row.name,
+      row.ot_date,
+      row.ot_hours,
+      row.comp_off ? 'Yes' : 'No',
+    ]);
 
-      return `"${text.replace(
-        /"/g,
-        '""'
-      )}"`;
-    };
-
-    const rows =
-      filteredAdminOT.map(
-        (entry) => [
-          entry.employee_id,
-          entry.name,
-          entry.ot_date,
-          entry.start_time,
-          entry.end_time,
-          Number(
-            entry.ot_hours || 0
-          ).toFixed(2),
-          entry.reason || '',
-          entry.comp_off_date ||
-            '',
-          entry.comp_off_status ||
-            ''
-        ]
-      );
-
-    const csv = [
-      headers
-        .map(escapeCSV)
-        .join(','),
-      ...rows.map((row) =>
+    const csv = [header, ...rows]
+      .map(row =>
         row
-          .map(escapeCSV)
+          .map(value => `"${String(value ?? '').replace(/"/g, '""')}"`)
           .join(',')
       )
-    ].join('\r\n');
+      .join('\n');
 
-    const blob =
-      new Blob(
-        ['\uFEFF' + csv],
-        {
-          type:
-            'text/csv;charset=utf-8;'
-        }
-      );
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;',
+    });
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
 
-    const link =
-      document.createElement(
-        'a'
-      );
-
-    link.href = url;
-
-    link.download =
-      `OT_CompOff_${fromDate || 'All'}_to_${toDate || 'All'}.csv`;
-
-    document.body.appendChild(
-      link
-    );
-
-    link.click();
-
-    document.body.removeChild(
-      link
-    );
+    a.href = url;
+    a.download = 'OT_Records.csv';
+    a.click();
 
     URL.revokeObjectURL(url);
-
-    setMessage(
-      `${filteredAdminOT.length} OT records download ho gaye.`
-    );
   }
 
-  /* =====================================================
-     LOGOUT
-     ===================================================== */
-
-  function logout() {
-    localStorage.removeItem(
-      'ot_staff'
-    );
-
-    setStaff(null);
-    setEntries([]);
-    setAdminStaff([]);
-    setAdminOT([]);
-    setAdminList([]);
-
-    setEmployeeId('');
-    setAdminEmployeeId('');
-    setAdminPassword('');
-
-    setAdminSection(
-      'dashboard'
-    );
-
-    setAdminLoginMode(false);
-
+  function openSection(
+    section:
+      | 'dashboard'
+      | 'staff'
+      | 'add'
+      | 'ot'
+      | 'management'
+      | 'password'
+  ) {
+    setAdminSection(section);
     setMessage('');
-  }
 
-  /* =====================================================
-     LOGIN PAGE
-     ===================================================== */
+    if (section === 'staff') loadStaff();
+    if (section === 'ot') loadOT();
+    if (section === 'management') {
+      loadStaff();
+      loadAdmins();
+    }
+  }
 
   if (!staff) {
     return (
-      <main className="center">
+      <>
+        <div className="loginPage">
+          <div className="loginCard">
+            <div className="brandLogo">OT</div>
 
-        <section className="card login">
-
-          <div className="logo">
-            OT
-          </div>
-
-          <h1>
-            OT & Comp-Off
-          </h1>
-
-          {!adminLoginMode ? (
-            <>
-              <p className="muted">
-                Staff Login
-              </p>
-
-              <label>
-                Employee ID
-              </label>
-
-              <input
-                value={employeeId}
-                onChange={(e) =>
-                  setEmployeeId(
-                    e.target.value
-                  )
-                }
-                placeholder="Enter Employee ID"
-                onKeyDown={(e) => {
-                  if (
-                    e.key ===
-                    'Enter'
-                  ) {
-                    login();
-                  }
-                }}
-              />
-
-              <button
-                onClick={login}
-                disabled={loading}
-              >
-                {loading
-                  ? 'Checking...'
-                  : 'Login'}
-              </button>
-
-              <div
-                style={{
-                  marginTop: '20px',
-                  paddingTop: '20px',
-                  borderTop:
-                    '1px solid #ddd'
-                }}
-              >
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    setAdminLoginMode(
-                      true
-                    );
-                    setMessage('');
-                  }}
-                >
-                  Admin Login
-                </button>
-              </div>
-
-              <small>
-                Staff login ke liye
-                Employee ID required
-                hai.
-              </small>
-            </>
-          ) : (
-            <>
-              <p className="muted">
-                Admin Login
-              </p>
-
-              <label>
-                Employee ID
-              </label>
-
-              <input
-                value={
-                  adminEmployeeId
-                }
-                onChange={(e) =>
-                  setAdminEmployeeId(
-                    e.target.value
-                  )
-                }
-                placeholder="Enter Admin Employee ID"
-              />
-
-              <label>
-                Admin Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  adminPassword
-                }
-                onChange={(e) =>
-                  setAdminPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Enter Admin Password"
-                onKeyDown={(e) => {
-                  if (
-                    e.key ===
-                    'Enter'
-                  ) {
-                    adminLogin();
-                  }
-                }}
-              />
-
-              <button
-                onClick={
-                  adminLogin
-                }
-                disabled={loading}
-              >
-                {loading
-                  ? 'Checking...'
-                  : 'Admin Login'}
-              </button>
-
-              <button
-                className="secondary"
-                onClick={() => {
-                  setAdminLoginMode(
-                    false
-                  );
-                  setAdminEmployeeId(
-                    ''
-                  );
-                  setAdminPassword(
-                    ''
-                  );
-                  setMessage('');
-                }}
-                style={{
-                  marginTop: '8px'
-                }}
-              >
-                Back to Staff Login
-              </button>
-
-              <small>
-                Admin ID + Password
-                required.
-              </small>
-            </>
-          )}
-
-          {message && (
-            <p className="msg">
-              {message}
+            <h1>OT & COMP-OFF</h1>
+            <p className="loginSubtitle">
+              Employee Operations Portal
             </p>
-          )}
 
-        </section>
-
-      </main>
-    );
-  }
-
-  /* =====================================================
-     ADMIN PANEL
-     ===================================================== */
-
-  if (
-    staff.role === 'admin'
-  ) {
-    return (
-      <main className="page">
-
-        <header className="topbar">
-
-          <div>
-            <b>
-              OT & Comp-Off
-            </b>
-
-            <span>
-              {' '}Admin Panel
-            </span>
-          </div>
-
-          <button
-            className="secondary"
-            onClick={logout}
-          >
-            Logout
-          </button>
-
-        </header>
-
-        {message && (
-          <section className="card">
-            <p className="msg">
-              {message}
-            </p>
-          </section>
-        )}
-
-        {/* =================================================
-            ADMIN DASHBOARD
-            ================================================= */}
-
-        {adminSection ===
-          'dashboard' && (
-          <>
-            <section className="welcome">
-
-              <div>
-
-                <p className="muted">
-                  Welcome Admin
-                </p>
-
-                <h2>
-                  {staff.name}
-                </h2>
-
-                <span className="pill">
-                  {staff.employee_id}
-                </span>
-
-              </div>
-
-              <div className="stat">
-
-                <span>
-                  Total OT
-                </span>
-
-                <b>
-                  {adminTotalOT.toFixed(
-                    2
-                  )}{' '}
-                  hrs
-                </b>
-
-              </div>
-
-            </section>
-
-            <section
-              className="dashboardGrid"
-            >
-
-              <button
-                className="dashboardCard"
-                onClick={() =>
-                  setAdminSection(
-                    'staff'
-                  )
-                }
-              >
-                <div className="dashboardIcon">
-                  👥
-                </div>
-
-                <h3>
-                  Staff Details
-                </h3>
-
-                <p>
-                  View, edit and manage employees
-                </p>
-              </button>
-
-              <button
-                className="dashboardCard"
-                onClick={() =>
-                  setAdminSection(
-                    'add'
-                  )
-                }
-              >
-                <div className="dashboardIcon">
-                  ➕
-                </div>
-
-                <h3>
-                  Add Employee
-                </h3>
-
-                <p>
-                  Add new employee to the system
-                </p>
-              </button>
-
-              <button
-                className="dashboardCard"
-                onClick={() =>
-                  setAdminSection(
-                    'ot'
-                  )
-                }
-              >
-                <div className="dashboardIcon">
-                  🕒
-                </div>
-
-                <h3>
-                  OT Records
-                </h3>
-
-                <p>
-                  View, filter and download OT
-                </p>
-              </button>
-
-              <button
-                className="dashboardCard"
-                onClick={() =>
-                  setAdminSection(
-                    'management'
-                  )
-                }
-              >
-                <div className="dashboardIcon">
-                  ⚙️
-                </div>
-
-                <h3>
-                  Admin Management
-                </h3>
-
-                <p>
-                  Manage admins, staff and passwords
-                </p>
-              </button>
-
-              <button
-                className="dashboardCard logoutCard"
-                onClick={logout}
-              >
-                <div className="dashboardIcon">
-                  🚪
-                </div>
-
-                <h3>
-                  Logout
-                </h3>
-
-                <p>
-                  Sign out from Admin Panel
-                </p>
-              </button>
-
-            </section>
-          </>
-        )}
-
-        {/* =================================================
-            STAFF DETAILS
-            ================================================= */}
-
-        {adminSection ===
-          'staff' && (
-          <section className="card">
-
-            <div className="sectionHead">
-
-              <div>
-                <h3>
-                  Staff Details
-                </h3>
-
-                <span className="muted">
-                  {adminStaff.length}{' '}
-                  employees
-                </span>
-              </div>
-
-              <button
-                className="secondary"
-                onClick={() =>
-                  setAdminSection(
-                    'dashboard'
-                  )
-                }
-              >
-                ← Back to Dashboard
-              </button>
-
-            </div>
-
-            <div className="tableWrap">
-
-              <table>
-
-                <thead>
-
-                  <tr>
-                    <th>
-                      Employee ID
-                    </th>
-
-                    <th>
-                      Name
-                    </th>
-
-                    <th>
-                      Role
-                    </th>
-
-                    <th>
-                      Status
-                    </th>
-
-                    <th>
-                      Action
-                    </th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {adminStaff.map(
-                    (employee) => (
-                      <tr
-                        key={
-                          employee.id
-                        }
-                      >
-
-                        {editingStaffId ===
-                        employee.id ? (
-                          <>
-                            <td>
-                              <input
-                                value={
-                                  editingEmployeeId
-                                }
-                                onChange={(
-                                  e
-                                ) =>
-                                  setEditingEmployeeId(
-                                    e
-                                      .target
-                                      .value
-                                  )
-                                }
-                              />
-                            </td>
-
-                            <td>
-                              <input
-                                value={
-                                  editingName
-                                }
-                                onChange={(
-                                  e
-                                ) =>
-                                  setEditingName(
-                                    e
-                                      .target
-                                      .value
-                                  )
-                                }
-                              />
-                            </td>
-
-                            <td>
-                              {
-                                employee.role
-                              }
-                            </td>
-
-                            <td>
-                              {employee.access_enabled
-                                ? 'Active'
-                                : 'Disabled'}
-                            </td>
-
-                            <td>
-                              <div
-                                style={{
-                                  display:
-                                    'flex',
-                                  gap: '6px',
-                                  flexWrap:
-                                    'wrap'
-                                }}
-                              >
-                                <button
-                                  className="small"
-                                  onClick={
-                                    saveEdit
-                                  }
-                                  disabled={
-                                    adminLoading
-                                  }
-                                >
-                                  Save
-                                </button>
-
-                                <button
-                                  className="small secondary"
-                                  onClick={
-                                    cancelEdit
-                                  }
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td>
-                              {
-                                employee.employee_id
-                              }
-                            </td>
-
-                            <td>
-                              {
-                                employee.name
-                              }
-                            </td>
-
-                            <td>
-                              {
-                                employee.role
-                              }
-                            </td>
-
-                            <td>
-                              {employee.access_enabled
-                                ? 'Active'
-                                : 'Disabled'}
-                            </td>
-
-                            <td>
-                              {employee.role ===
-                              'admin' ? (
-                                <span className="pill">
-                                  Admin
-                                </span>
-                              ) : (
-                                <div
-                                  style={{
-                                    display:
-                                      'flex',
-                                    gap: '6px',
-                                    flexWrap:
-                                      'wrap'
-                                  }}
-                                >
-                                  <button
-                                    className="small"
-                                    onClick={() =>
-                                      startEdit(
-                                        employee
-                                      )
-                                    }
-                                  >
-                                    Edit
-                                  </button>
-
-                                  <button
-                                    className="small"
-                                    onClick={() =>
-                                      toggleEmployee(
-                                        employee.id,
-                                        !employee.access_enabled
-                                      )
-                                    }
-                                    disabled={
-                                      adminLoading
-                                    }
-                                  >
-                                    {employee.access_enabled
-                                      ? 'Disable'
-                                      : 'Enable'}
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </>
-                        )}
-
-                      </tr>
-                    )
-                  )}
-
-                  {adminStaff.length ===
-                    0 && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        style={{
-                          textAlign:
-                            'center'
-                        }}
-                      >
-                        No employees found.
-                      </td>
-                    </tr>
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          </section>
-        )}
-
-        {/* =================================================
-            ADD EMPLOYEE
-            ================================================= */}
-
-        {adminSection ===
-          'add' && (
-          <section className="card">
-
-            <div className="sectionHead">
-
-              <h3>
-                Add Employee
-              </h3>
-
-              <button
-                className="secondary"
-                onClick={() =>
-                  setAdminSection(
-                    'dashboard'
-                  )
-                }
-              >
-                ← Back to Dashboard
-              </button>
-
-            </div>
-
-            <div className="grid">
-
-              <div>
-
-                <label>
-                  Employee ID
-                </label>
-
-                <input
-                  value={
-                    newEmployeeId
-                  }
-                  onChange={(e) =>
-                    setNewEmployeeId(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter Employee ID"
-                />
-
-              </div>
-
-              <div>
-
-                <label>
-                  Employee Name
-                </label>
-
-                <input
-                  value={
-                    newEmployeeName
-                  }
-                  onChange={(e) =>
-                    setNewEmployeeName(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter Employee Name"
-                />
-
-              </div>
-
-            </div>
-
-            <button
-              onClick={
-                addEmployee
-              }
-              disabled={
-                adminLoading
-              }
-            >
-              {adminLoading
-                ? 'Saving...'
-                : 'Add Employee'}
+            <label>Employee ID</label>
+            <input
+              value={employeeId}
+              onChange={e => setEmployeeId(e.target.value)}
+              placeholder="Enter Employee ID"
+              onKeyDown={e => {
+                if (e.key === 'Enter') login();
+              }}
+            />
+
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Admin password only"
+              onKeyDown={e => {
+                if (e.key === 'Enter') login();
+              }}
+            />
+
+            {message && <div className="message">{message}</div>}
+
+            <button className="primaryBtn" onClick={login} disabled={loading}>
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
 
-          </section>
-        )}
-
-        {/* =================================================
-            OT RECORDS
-            ================================================= */}
-
-        {adminSection ===
-          'ot' && (
-          <section className="card">
-
-            <div className="sectionHead">
-
-              <div>
-
-                <h3>
-                  OT Records
-                </h3>
-
-                <span className="muted">
-                  {filteredAdminOT.length}{' '}
-                  records
-                </span>
-
-              </div>
-
-              <button
-                className="secondary"
-                onClick={() =>
-                  setAdminSection(
-                    'dashboard'
-                  )
-                }
-              >
-                ← Back to Dashboard
-              </button>
-
-            </div>
-
-            <div className="grid">
-
-              <div>
-
-                <label>
-                  From Date
-                </label>
-
-                <input
-                  type="date"
-                  value={
-                    fromDate
-                  }
-                  onChange={(e) =>
-                    setFromDate(
-                      e.target.value
-                    )
-                  }
-                />
-
-              </div>
-
-              <div>
-
-                <label>
-                  To Date
-                </label>
-
-                <input
-                  type="date"
-                  value={
-                    toDate
-                  }
-                  onChange={(e) =>
-                    setToDate(
-                      e.target.value
-                    )
-                  }
-                />
-
-              </div>
-
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                flexWrap: 'wrap',
-                marginTop: '12px'
-              }}
-            >
-
-              <button
-                onClick={() =>
-                  setMessage(
-                    `${filteredAdminOT.length} records found.`
-                  )
-                }
-              >
-                View Records
-              </button>
-
-              <button
-                className="secondary"
-                onClick={() => {
-                  setFromDate('');
-                  setToDate('');
-                }}
-              >
-                Clear Filter
-              </button>
-
-              <button
-                onClick={
-                  downloadOTExcel
-                }
-                disabled={
-                  adminLoading ||
-                  filteredAdminOT.length ===
-                    0
-                }
-              >
-                Download Excel
-              </button>
-
-            </div>
-
-            <div
-              className="stat"
-              style={{
-                marginTop: '15px'
-              }}
-            >
-              <span>
-                Filtered Total OT
-              </span>
-
-              <b>
-                {adminTotalOT.toFixed(
-                  2
-                )}{' '}
-                hrs
-              </b>
-            </div>
-
-            <div className="tableWrap">
-
-              <table>
-
-                <thead>
-
-                  <tr>
-                    <th>
-                      Employee ID
-                    </th>
-
-                    <th>
-                      Employee Name
-                    </th>
-
-                    <th>
-                      OT Date
-                    </th>
-
-                    <th>
-                      Start Time
-                    </th>
-
-                    <th>
-                      End Time
-                    </th>
-
-                    <th>
-                      OT Hours
-                    </th>
-
-                    <th>
-                      Reason
-                    </th>
-
-                    <th>
-                      Comp-Off Date
-                    </th>
-
-                    <th>
-                      Comp-Off Status
-                    </th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {filteredAdminOT.map(
-                    (entry) => (
-                      <tr
-                        key={
-                          entry.id
-                        }
-                      >
-
-                        <td>
-                          {
-                            entry.employee_id
-                          }
-                        </td>
-
-                        <td>
-                          {entry.name}
-                        </td>
-
-                        <td>
-                          {
-                            entry.ot_date
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            entry.start_time
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            entry.end_time
-                          }
-                        </td>
-
-                        <td>
-                          {Number(
-                            entry.ot_hours ||
-                              0
-                          ).toFixed(2)}
-                        </td>
-
-                        <td>
-                          {
-                            entry.reason ||
-                            '-'
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            entry.comp_off_date ||
-                            '-'
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            entry.comp_off_status ||
-                            '-'
-                          }
-                        </td>
-
-                      </tr>
-                    )
-                  )}
-
-                  {filteredAdminOT.length ===
-                    0 && (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        style={{
-                          textAlign:
-                            'center'
-                        }}
-                      >
-                        No OT records found.
-                      </td>
-                    </tr>
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          </section>
-        )}
-
-        {/* =================================================
-            ADMIN MANAGEMENT
-            ================================================= */}
-
-        {adminSection ===
-          'management' && (
-          <>
-
-            <section className="card">
-
-              <div className="sectionHead">
-
-                <div>
-                  <h3>
-                    Admin Management
-                  </h3>
-
-                  <span className="muted">
-                    Manage Admin access
-                  </span>
-                </div>
-
-                <button
-                  className="secondary"
-                  onClick={() =>
-                    setAdminSection(
-                      'dashboard'
-                    )
-                  }
-                >
-                  ← Back to Dashboard
-                </button>
-
-              </div>
-
-            </section>
-
-            {/* MAKE ADMIN */}
-
-            <section className="card">
-
-              <h3>
-                Make Admin
-              </h3>
-
-              <p className="muted">
-                Existing Staff ko Admin
-                banaye.
-              </p>
-
-              <label>
-                Select Staff
-              </label>
-
-              <select
-                value={
-                  selectedMakeAdminStaffId
-                }
-                onChange={(e) =>
-                  setSelectedMakeAdminStaffId(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="">
-                  Select Staff
-                </option>
-
-                {adminStaff
-                  .filter(
-                    (item) =>
-                      item.role !==
-                        'admin' &&
-                      item.employee_id
-                        .trim()
-                        .toUpperCase() !==
-                        'SAS102'
-                  )
-                  .map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.employee_id} -{' '}
-                      {item.name}
-                    </option>
-                  ))}
-              </select>
-
-              <label>
-                New Admin Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  makeAdminPassword
-                }
-                onChange={(e) =>
-                  setMakeAdminPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Minimum 6 characters"
-              />
-
-              <label>
-                Confirm Admin Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  makeAdminConfirmPassword
-                }
-                onChange={(e) =>
-                  setMakeAdminConfirmPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Confirm password"
-              />
-
-              <button
-                onClick={
-                  makeAdmin
-                }
-                disabled={
-                  adminLoading
-                }
-              >
-                {adminLoading
-                  ? 'Processing...'
-                  : 'Make Admin'}
-              </button>
-
-            </section>
-
-            {/* REMOVE ADMIN */}
-
-            <section className="card">
-
-              <h3>
-                Remove Admin
-              </h3>
-
-              <p className="muted">
-                Main Admin SAS102 protected
-                hai.
-              </p>
-
-              <label>
-                Select Admin
-              </label>
-
-              <select
-                value={
-                  selectedRemoveAdminId
-                }
-                onChange={(e) =>
-                  setSelectedRemoveAdminId(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="">
-                  Select Admin
-                </option>
-
-                {adminList.map(
-                  (item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.employee_id} -{' '}
-                      {item.name}
-                    </option>
-                  )
-                )}
-
-              </select>
-
-              <button
-                onClick={
-                  removeAdmin
-                }
-                disabled={
-                  adminLoading
-                }
-              >
-                Remove Admin
-              </button>
-
-            </section>
-
-            {/* REMOVE STAFF */}
-
-            <section className="card">
-
-              <h3>
-                Remove Staff
-              </h3>
-
-              <p className="muted">
-                Staff login/access remove
-                hoga. OT/Comp-Off history
-                preserve rahegi.
-              </p>
-
-              <label>
-                Select Staff
-              </label>
-
-              <select
-                value={
-                  selectedRemoveStaffId
-                }
-                onChange={(e) =>
-                  setSelectedRemoveStaffId(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="">
-                  Select Staff
-                </option>
-
-                {adminStaff
-                  .filter(
-                    (item) =>
-                      item.role !==
-                        'admin' &&
-                      item.employee_id
-                        .trim()
-                        .toUpperCase() !==
-                        'SAS102'
-                  )
-                  .map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.employee_id} -{' '}
-                      {item.name}
-                    </option>
-                  ))}
-              </select>
-
-              <button
-                onClick={
-                  removeStaff
-                }
-                disabled={
-                  adminLoading
-                }
-              >
-                Remove Staff
-              </button>
-
-            </section>
-
-            {/* RESET ADMIN PASSWORD */}
-
-            <section className="card">
-
-              <h3>
-                Reset Admin Password
-              </h3>
-
-              <p className="muted">
-                Existing Admin ka password
-                reset karo.
-              </p>
-
-              <label>
-                Select Admin
-              </label>
-
-              <select
-                value={
-                  selectedResetAdminId
-                }
-                onChange={(e) =>
-                  setSelectedResetAdminId(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="">
-                  Select Admin
-                </option>
-
-                {adminList.map(
-                  (item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.employee_id} -{' '}
-                      {item.name}
-                    </option>
-                  )
-                )}
-
-              </select>
-
-              <label>
-                New Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  resetAdminPassword
-                }
-                onChange={(e) =>
-                  setResetAdminPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Minimum 6 characters"
-              />
-
-              <label>
-                Confirm Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  resetAdminConfirmPassword
-                }
-                onChange={(e) =>
-                  setResetAdminConfirmPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Confirm password"
-              />
-
-              <button
-                onClick={
-                  resetAdminPasswordFn
-                }
-                disabled={
-                  adminLoading
-                }
-              >
-                Reset Admin Password
-              </button>
-
-            </section>
-
-            {/* CHANGE MY PASSWORD */}
-
-            <section className="card">
-
-              <h3>
-                Change My Password
-              </h3>
-
-              <p className="muted">
-                Current Admin password change
-                karne ke liye old password
-                mandatory hai.
-              </p>
-
-              <label>
-                Old Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  oldPassword
-                }
-                onChange={(e) =>
-                  setOldPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Enter old password"
-              />
-
-              <label>
-                New Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  newPassword
-                }
-                onChange={(e) =>
-                  setNewPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Minimum 6 characters"
-              />
-
-              <label>
-                Confirm New Password
-              </label>
-
-              <input
-                type="password"
-                value={
-                  confirmPassword
-                }
-                onChange={(e) =>
-                  setConfirmPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Confirm new password"
-              />
-
-              <button
-                onClick={
-                  changeMyPassword
-                }
-                disabled={
-                  adminLoading
-                }
-              >
-                Change My Password
-              </button>
-
-            </section>
-
-          </>
-        )}
-
-      </main>
+            <p className="loginNote">
+              Staff can sign in with Employee ID.
+              <br />
+              Admin login requires password.
+            </p>
+          </div>
+        </div>
+
+        <style jsx global>{styles}</style>
+      </>
     );
   }
 
-  /* =====================================================
-     STAFF PORTAL
-     ===================================================== */
+  if (isAdmin) {
+    return (
+      <>
+        <div className="appPage">
+          <header className="topbar">
+            <div>
+              <div className="brandName">OT & COMP-OFF</div>
+              <div className="brandSub">Operations Management Portal</div>
+            </div>
+
+            <div className="topRight">
+              <div className="adminInfo">
+                <span>Admin</span>
+                <strong>{staff.employee_id}</strong>
+              </div>
+
+              <button className="logoutBtn" onClick={logout}>
+                Logout
+              </button>
+            </div>
+          </header>
+
+          <main className="mainContent">
+            {adminSection === 'dashboard' && (
+              <>
+                <section className="welcomeCard">
+                  <div>
+                    <div className="smallLabel">ADMINISTRATOR PANEL</div>
+                    <h2>Good Morning, {staff.name}</h2>
+                    <p>
+                      Manage employees, OT records and administrator access
+                      from one place.
+                    </p>
+                  </div>
+
+                  <div className="adminBadge">
+                    <span>ADMIN ID</span>
+                    <strong>{staff.employee_id}</strong>
+                  </div>
+                </section>
+
+                <section className="dashboardGrid">
+                  <DashboardCard
+                    icon="👥"
+                    title="Staff Details"
+                    description="View employee details and access status."
+                    onClick={() => openSection('staff')}
+                  />
+
+                  <DashboardCard
+                    icon="＋"
+                    title="Add Employee"
+                    description="Create a new employee access record."
+                    onClick={() => openSection('add')}
+                  />
+
+                  <DashboardCard
+                    icon="◷"
+                    title="OT Records"
+                    description="View, filter and download OT records."
+                    onClick={() => openSection('ot')}
+                  />
+
+                  <DashboardCard
+                    icon="⚙"
+                    title="Admin Management"
+                    description="Manage administrators and staff access."
+                    onClick={() => openSection('management')}
+                  />
+
+                  <DashboardCard
+                    icon="🔐"
+                    title="Change Password"
+                    description="Securely change your admin password."
+                    onClick={() => openSection('password')}
+                  />
+
+                  <DashboardCard
+                    icon="↪"
+                    title="Logout"
+                    description="Sign out securely from the portal."
+                    danger
+                    onClick={logout}
+                  />
+                </section>
+
+                <section className="overviewSection">
+                  <div className="sectionTitle">
+                    <div>
+                      <h3>Quick Overview</h3>
+                      <p>Current portal summary</p>
+                    </div>
+                  </div>
+
+                  <div className="overviewGrid">
+                    <OverviewCard
+                      label="Active Staff"
+                      value="—"
+                      icon="👥"
+                    />
+                    <OverviewCard
+                      label="OT Records"
+                      value={otRecords.length || '—'}
+                      icon="◷"
+                    />
+                    <OverviewCard
+                      label="OT Hours"
+                      value={totalHours || '—'}
+                      icon="⌛"
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {adminSection !== 'dashboard' && (
+              <button
+                className="backBtn"
+                onClick={() => openSection('dashboard')}
+              >
+                ← Back to Dashboard
+              </button>
+            )}
+
+            {adminSection === 'staff' && (
+              <section className="contentCard">
+                <SectionHeader
+                  title="Staff Details"
+                  subtitle="View all employees and their current access status."
+                />
+
+                <button
+                  className="secondaryBtn"
+                  onClick={loadStaff}
+                  disabled={loading}
+                >
+                  ↻ Refresh
+                </button>
+
+                <div className="tableContainer">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Access</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {staffList.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="empty">
+                            No staff records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        staffList.map(row => (
+                          <tr key={row.id}>
+                            <td>
+                              <strong>{row.employee_id}</strong>
+                            </td>
+                            <td>{row.name}</td>
+                            <td>
+                              <span className="roleBadge">
+                                {row.role || 'staff'}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={
+                                  row.access_enabled
+                                    ? 'status active'
+                                    : 'status inactive'
+                                }
+                              >
+                                {row.access_enabled
+                                  ? 'Active'
+                                  : 'Disabled'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {message && <div className="message">{message}</div>}
+              </section>
+            )}
+
+            {adminSection === 'add' && (
+              <section className="contentCard narrowContent">
+                <SectionHeader
+                  title="Add Employee"
+                  subtitle="Create access for a new employee."
+                />
+
+                <div className="formGrid">
+                  <div>
+                    <label>Employee ID</label>
+                    <input
+                      value={newEmployeeId}
+                      onChange={e => setNewEmployeeId(e.target.value)}
+                      placeholder="e.g. EMP1001"
+                    />
+                  </div>
+
+                  <div>
+                    <label>Employee Name</label>
+                    <input
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder="Enter employee name"
+                    />
+                  </div>
+                </div>
+
+                {message && <div className="message">{message}</div>}
+
+                <button
+                  className="primaryBtn smallBtn"
+                  onClick={addEmployee}
+                  disabled={loading}
+                >
+                  {loading ? 'Adding...' : 'Add Employee'}
+                </button>
+              </section>
+            )}
+
+            {adminSection === 'ot' && (
+              <section className="contentCard">
+                <SectionHeader
+                  title="OT Records"
+                  subtitle="Filter OT records by date and download them as CSV."
+                />
+
+                <div className="filterGrid">
+                  <div>
+                    <label>From Date</label>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={e => setFromDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label>To Date</label>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={e => setToDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="filterActions">
+                    <button
+                      className="primaryBtn"
+                      onClick={loadOT}
+                      disabled={loading}
+                    >
+                      View Records
+                    </button>
+
+                    <button
+                      className="secondaryBtn"
+                      onClick={() => {
+                        setFromDate('');
+                        setToDate('');
+                      }}
+                    >
+                      Clear
+                    </button>
+
+                    <button
+                      className="downloadBtn"
+                      onClick={downloadCSV}
+                    >
+                      ↓ Download Excel
+                    </button>
+                  </div>
+                </div>
+
+                <div className="summaryRow">
+                  <div>
+                    <span>Records</span>
+                    <strong>{filteredOT.length}</strong>
+                  </div>
+
+                  <div>
+                    <span>Total OT Hours</span>
+                    <strong>{totalHours}</strong>
+                  </div>
+                </div>
+
+                <div className="tableContainer">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>OT Date</th>
+                        <th>OT Hours</th>
+                        <th>Comp-Off</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {filteredOT.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="empty">
+                            No OT records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredOT.map(row => (
+                          <tr key={row.id}>
+                            <td>{row.employee_id}</td>
+                            <td>{row.name}</td>
+                            <td>{row.ot_date}</td>
+                            <td>{row.ot_hours}</td>
+                            <td>
+                              {row.comp_off ? (
+                                <span className="status active">
+                                  Yes
+                                </span>
+                              ) : (
+                                <span className="status inactive">
+                                  No
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {adminSection === 'management' && (
+              <section className="contentCard">
+                <SectionHeader
+                  title="Admin Management"
+                  subtitle="Manage administrator privileges and employee access."
+                />
+
+                <div className="managementGrid">
+                  <div className="managementCard">
+                    <div className="managementIcon">🛡</div>
+                    <h3>Admin List</h3>
+                    <p>
+                      Remove admin access from an existing administrator.
+                    </p>
+
+                    <select
+                      value={selectedAdmin}
+                      onChange={e => setSelectedAdmin(e.target.value)}
+                    >
+                      <option value="">Select Admin</option>
+
+                      {adminList.map(admin => (
+                        <option key={admin.id} value={admin.id}>
+                          {admin.employee_id} - {admin.name}
+                          {admin.employee_id === MAIN_ADMIN_ID
+                            ? ' (Main Admin)'
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      className="dangerBtn"
+                      onClick={removeAdmin}
+                      disabled={loading || !selectedAdmin}
+                    >
+                      Remove Admin
+                    </button>
+                  </div>
+
+                  <div className="managementCard">
+                    <div className="managementIcon">＋</div>
+                    <h3>Make Admin</h3>
+                    <p>
+                      Select a staff member and create their admin login.
+                    </p>
+
+                    <select
+                      value={selectedStaff}
+                      onChange={e => setSelectedStaff(e.target.value)}
+                    >
+                      <option value="">Select Employee</option>
+
+                      {staffList
+                        .filter(x => x.role !== 'admin')
+                        .map(row => (
+                          <option key={row.id} value={row.id}>
+                            {row.employee_id} - {row.name}
+                          </option>
+                        ))}
+                    </select>
+
+                    <input
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={e =>
+                        setNewAdminPassword(e.target.value)
+                      }
+                      placeholder="New admin password"
+                    />
+
+                    <input
+                      type="password"
+                      value={confirmAdminPassword}
+                      onChange={e =>
+                        setConfirmAdminPassword(e.target.value)
+                      }
+                      placeholder="Confirm admin password"
+                    />
+
+                    <button
+                      className="primaryBtn"
+                      onClick={makeAdmin}
+                      disabled={loading}
+                    >
+                      Make Admin
+                    </button>
+                  </div>
+
+                  <div className="managementCard">
+                    <div className="managementIcon dangerIcon">−</div>
+                    <h3>Remove Staff</h3>
+                    <p>
+                      Disable employee login while keeping their old OT
+                      history.
+                    </p>
+
+                    <select
+                      value={selectedStaff}
+                      onChange={e => setSelectedStaff(e.target.value)}
+                    >
+                      <option value="">Select Staff</option>
+
+                      {staffList
+                        .filter(x => x.role !== 'admin')
+                        .map(row => (
+                          <option key={row.id} value={row.id}>
+                            {row.employee_id} - {row.name}
+                          </option>
+                        ))}
+                    </select>
+
+                    <button
+                      className="dangerBtn"
+                      onClick={removeStaff}
+                      disabled={loading || !selectedStaff}
+                    >
+                      Remove Staff
+                    </button>
+                  </div>
+
+                  <div className="managementCard">
+                    <div className="managementIcon">🔑</div>
+                    <h3>Reset Admin Password</h3>
+                    <p>
+                      Select an existing administrator and set a new
+                      password.
+                    </p>
+
+                    <select
+                      value={selectedAdmin}
+                      onChange={e => setSelectedAdmin(e.target.value)}
+                    >
+                      <option value="">Select Admin</option>
+
+                      {adminList.map(admin => (
+                        <option key={admin.id} value={admin.id}>
+                          {admin.employee_id} - {admin.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={e =>
+                        setNewAdminPassword(e.target.value)
+                      }
+                      placeholder="New password"
+                    />
+
+                    <input
+                      type="password"
+                      value={confirmAdminPassword}
+                      onChange={e =>
+                        setConfirmAdminPassword(e.target.value)
+                      }
+                      placeholder="Confirm password"
+                    />
+
+                    <button
+                      className="primaryBtn"
+                      onClick={resetAdminPassword}
+                      disabled={loading}
+                    >
+                      Reset Password
+                    </button>
+                  </div>
+                </div>
+
+                {message && <div className="message">{message}</div>}
+              </section>
+            )}
+
+            {adminSection === 'password' && (
+              <section className="contentCard narrowContent">
+                <SectionHeader
+                  title="Change My Password"
+                  subtitle="Your current password is required before changing it."
+                />
+
+                <div className="passwordForm">
+                  <div>
+                    <label>Old Password</label>
+                    <input
+                      type="password"
+                      value={oldPassword}
+                      onChange={e => setOldPassword(e.target.value)}
+                      placeholder="Enter old password"
+                    />
+                  </div>
+
+                  <div>
+                    <label>New Password</label>
+                    <input
+                      type="password"
+                      value={myNewPassword}
+                      onChange={e =>
+                        setMyNewPassword(e.target.value)
+                      }
+                      placeholder="Minimum 6 characters"
+                    />
+                  </div>
+
+                  <div>
+                    <label>Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={confirmMyNewPassword}
+                      onChange={e =>
+                        setConfirmMyNewPassword(e.target.value)
+                      }
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                </div>
+
+                {message && <div className="message">{message}</div>}
+
+                <button
+                  className="primaryBtn"
+                  onClick={changeMyPassword}
+                  disabled={loading}
+                >
+                  {loading ? 'Updating...' : 'Change Password'}
+                </button>
+              </section>
+            )}
+          </main>
+        </div>
+
+        <style jsx global>{styles}</style>
+      </>
+    );
+  }
 
   return (
-    <main className="page">
-
-      <header className="topbar">
-
-        <div>
-
-          <b>
-            OT & Comp-Off
-          </b>
-
-          <span>
-            {' '}Staff Portal
-          </span>
-
-        </div>
-
-        <button
-          className="secondary"
-          onClick={logout}
-        >
-          Logout
-        </button>
-
-      </header>
-
-      <section className="welcome">
-
-        <div>
-
-          <p className="muted">
-            Welcome
-          </p>
-
-          <h2>
-            {staff.name}
-          </h2>
-
-          <span className="pill">
-            {staff.employee_id}
-          </span>
-
-        </div>
-
-        <div className="stat">
-
-          <span>
-            Total OT
-          </span>
-
-          <b>
-            {total.toFixed(
-              2
-            )}{' '}
-            hrs
-          </b>
-
-        </div>
-
-      </section>
-
-      <section className="card">
-
-        <h3>
-          Add OT
-        </h3>
-
-        <div className="grid">
-
+    <>
+      <div className="appPage">
+        <header className="topbar">
           <div>
-
-            <label>
-              OT Date
-            </label>
-
-            <input
-              type="date"
-              value={
-                form.ot_date
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  ot_date:
-                    e.target.value
-                })
-              }
-            />
-
+            <div className="brandName">OT & COMP-OFF</div>
+            <div className="brandSub">Employee Portal</div>
           </div>
 
-          <div>
+          <div className="topRight">
+            <div className="adminInfo">
+              <span>Employee</span>
+              <strong>{staff.employee_id}</strong>
+            </div>
 
-            <label>
-              Start Time
-            </label>
+            <button className="logoutBtn" onClick={logout}>
+              Logout
+            </button>
+          </div>
+        </header>
 
-            <input
-              type="time"
-              value={
-                form.start_time
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  start_time:
-                    e.target.value
-                })
-              }
+        <main className="mainContent">
+          <section className="welcomeCard">
+            <div>
+              <div className="smallLabel">EMPLOYEE PORTAL</div>
+              <h2>Welcome, {staff.name}</h2>
+              <p>
+                Your OT and Comp-Off management portal is ready.
+              </p>
+            </div>
+
+            <div className="adminBadge">
+              <span>EMPLOYEE ID</span>
+              <strong>{staff.employee_id}</strong>
+            </div>
+          </section>
+
+          <section className="dashboardGrid staffDashboard">
+            <DashboardCard
+              icon="＋"
+              title="Add OT"
+              description="Submit your overtime entry."
+              onClick={() => {}}
             />
 
-          </div>
-
-          <div>
-
-            <label>
-              End Time
-            </label>
-
-            <input
-              type="time"
-              value={
-                form.end_time
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  end_time:
-                    e.target.value
-                })
-              }
+            <DashboardCard
+              icon="◷"
+              title="My OT Records"
+              description="View your submitted OT records."
+              onClick={() => {}}
             />
 
-          </div>
-
-          <div className="wide">
-
-            <label>
-              Reason
-            </label>
-
-            <input
-              value={
-                form.reason
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  reason:
-                    e.target.value
-                })
-              }
-              placeholder="Reason for OT"
+            <DashboardCard
+              icon="↪"
+              title="Logout"
+              description="Sign out securely."
+              danger
+              onClick={logout}
             />
+          </section>
+        </main>
+      </div>
 
-          </div>
-
-        </div>
-
-        <div className="preview">
-
-          Calculated OT:{' '}
-
-          <b>
-            {calculateHours(
-              form.start_time,
-              form.end_time
-            ).toFixed(
-              2
-            )}{' '}
-            hours
-          </b>
-
-        </div>
-
-        <button
-          onClick={
-            addOT
-          }
-          disabled={
-            loading
-          }
-        >
-          {loading
-            ? 'Saving...'
-            : 'Save OT'}
-        </button>
-
-        {message && (
-          <p className="msg">
-            {message}
-          </p>
-        )}
-
-      </section>
-
-      <section className="card">
-
-        <div className="sectionHead">
-
-          <h3>
-            My OT Records
-          </h3>
-
-          <span className="muted">
-            {entries.length}{' '}
-            records
-          </span>
-
-        </div>
-
-        <div className="tableWrap">
-
-          <table>
-
-            <thead>
-
-              <tr>
-
-                <th>
-                  Date
-                </th>
-
-                <th>
-                  Time
-                </th>
-
-                <th>
-                  Hours
-                </th>
-
-                <th>
-                  Reason
-                </th>
-
-                <th>
-                  Comp-Off Date
-                </th>
-
-                <th>
-                  Status
-                </th>
-
-                <th>
-                  Action
-                </th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {entries.map(
-                (entry) => (
-                  <tr
-                    key={
-                      entry.id
-                    }
-                  >
-
-                    <td>
-                      {
-                        entry.ot_date
-                      }
-                    </td>
-
-                    <td>
-                      {
-                        entry.start_time
-                      }{' '}
-                      -{' '}
-                      {
-                        entry.end_time
-                      }
-                    </td>
-
-                    <td>
-                      {Number(
-                        entry.ot_hours
-                      ).toFixed(
-                        2
-                      )}
-                    </td>
-
-                    <td>
-                      {
-                        entry.reason ||
-                        '-'
-                      }
-                    </td>
-
-                    <td>
-                      {
-                        entry.comp_off_date ||
-                        ''
-                      }
-                    </td>
-
-                    <td>
-                      {
-                        entry.comp_off_status ||
-                        ''
-                      }
-                    </td>
-
-                    <td>
-
-                      {!entry.comp_off_date &&
-                        compOffEntryId !==
-                          entry.id && (
-
-                          <button
-                            className="small"
-                            onClick={() =>
-                              openCompOff(
-                                entry.id
-                              )
-                            }
-                          >
-                            Comp-Off
-                          </button>
-
-                        )}
-
-                      {compOffEntryId ===
-                        entry.id && (
-
-                        <div
-                          style={{
-                            display:
-                              'flex',
-                            gap: '6px',
-                            alignItems:
-                              'center',
-                            flexWrap:
-                              'wrap'
-                          }}
-                        >
-
-                          <input
-                            type="date"
-                            value={
-                              compOffDate
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              setCompOffDate(
-                                e
-                                  .target
-                                  .value
-                              )
-                            }
-                          />
-
-                          <button
-                            className="small"
-                            onClick={
-                              confirmCompOff
-                            }
-                            disabled={
-                              loading ||
-                              !compOffDate
-                            }
-                          >
-                            Confirm
-                          </button>
-
-                          <button
-                            className="small secondary"
-                            onClick={
-                              cancelCompOff
-                            }
-                            disabled={
-                              loading
-                            }
-                          >
-                            Cancel
-                          </button>
-
-                        </div>
-
-                      )}
-
-                    </td>
-
-                  </tr>
-                )
-              )}
-
-              {entries.length ===
-                0 && (
-                <tr>
-
-                  <td
-                    colSpan={7}
-                    style={{
-                      textAlign:
-                        'center'
-                    }}
-                  >
-                    No OT records found.
-                  </td>
-
-                </tr>
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </section>
-
-    </main>
+      <style jsx global>{styles}</style>
+    </>
   );
 }
+
+function DashboardCard({
+  icon,
+  title,
+  description,
+  onClick,
+  danger = false,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      className={`dashboardCard ${danger ? 'dangerCard' : ''}`}
+      onClick={onClick}
+    >
+      <div className={`dashboardIcon ${danger ? 'dangerIcon' : ''}`}>
+        {icon}
+      </div>
+
+      <div className="dashboardText">
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+
+      <span className="cardArrow">→</span>
+    </button>
+  );
+}
+
+function OverviewCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: string;
+}) {
+  return (
+    <div className="overviewCard">
+      <div className="overviewIcon">{icon}</div>
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="sectionHeader">
+      <div>
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+const styles = `
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  background: #f3f6fa;
+  color: #172033;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d9e0ea;
+  border-radius: 9px;
+  background: #fff;
+  color: #172033;
+  outline: none;
+  transition: .2s ease;
+}
+
+input:focus,
+select:focus {
+  border-color: #2857a4;
+  box-shadow: 0 0 0 3px rgba(40,87,164,.10);
+}
+
+label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #344054;
+}
+
+/* LOGIN */
+
+.loginPage {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 25px;
+  background:
+    radial-gradient(circle at top left, #e8f0ff 0, transparent 34%),
+    radial-gradient(circle at bottom right, #e9f3ff 0, transparent 32%),
+    #f5f7fb;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 430px;
+  padding: 38px;
+  background: rgba(255,255,255,.96);
+  border: 1px solid #e4e9f0;
+  border-radius: 20px;
+  box-shadow: 0 18px 50px rgba(23,43,77,.10);
+}
+
+.brandLogo {
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  border-radius: 15px;
+  background: linear-gradient(135deg,#173b7a,#2857a4);
+  color: white;
+  font-weight: 850;
+  font-size: 19px;
+  letter-spacing: 1px;
+  box-shadow: 0 9px 20px rgba(23,59,122,.20);
+}
+
+.loginCard h1 {
+  margin: 0;
+  color: #122747;
+  font-size: 28px;
+}
+
+.loginSubtitle {
+  margin: 7px 0 27px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.loginCard label {
+  margin-top: 15px;
+}
+
+.loginCard .primaryBtn {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.loginNote {
+  margin: 19px 0 0;
+  color: #98a2b3;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* BUTTONS */
+
+.primaryBtn,
+.secondaryBtn,
+.downloadBtn,
+.dangerBtn,
+.logoutBtn,
+.backBtn {
+  border-radius: 9px;
+  padding: 11px 17px;
+  font-weight: 650;
+  transition: .2s ease;
+}
+
+.primaryBtn {
+  background: #173b7a;
+  color: #fff;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  background: #102f63;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(23,59,122,.18);
+}
+
+.secondaryBtn {
+  background: #fff;
+  color: #344054;
+  border: 1px solid #d8e0ea;
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  border-color: #b9c6d8;
+  color: #173b7a;
+  background: #f8faff;
+}
+
+.downloadBtn {
+  background: #eaf1ff;
+  color: #173b7a;
+}
+
+.downloadBtn:hover {
+  background: #dce8ff;
+}
+
+.dangerBtn {
+  background: #fff1f1;
+  color: #a12828;
+  border: 1px solid #f1d5d5;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: #ffe6e6;
+}
+
+.logoutBtn {
+  background: #fff;
+  color: #344054;
+  border: 1px solid #d8e0ea;
+}
+
+.logoutBtn:hover {
+  color: #a12828;
+  border-color: #e2bcbc;
+  background: #fff8f8;
+}
+
+.smallBtn {
+  margin-top: 20px;
+}
+
+/* MAIN */
+
+.appPage {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 90% 0%, #e9f1ff 0, transparent 26%),
+    #f4f7fb;
+}
+
+.topbar {
+  min-height: 74px;
+  padding: 0 6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: rgba(255,255,255,.97);
+  border-bottom: 1px solid #e5eaf1;
+  box-shadow: 0 2px 10px rgba(16,24,40,.035);
+}
+
+.brandName {
+  color: #173b7a;
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: .2px;
+}
+
+.brandSub {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 11px;
+}
+
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.adminInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.adminInfo span {
+  color: #98a2b3;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+}
+
+.adminInfo strong {
+  color: #173b7a;
+  font-size: 13px;
+}
+
+/* CONTENT */
+
+.mainContent {
+  width: 88%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 0 55px;
+}
+
+.welcomeCard {
+  min-height: 150px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 25px;
+  padding: 27px 30px;
+  background: linear-gradient(120deg,#ffffff,#f8fbff);
+  border: 1px solid #e0e7f0;
+  border-radius: 17px;
+  box-shadow: 0 6px 22px rgba(16,24,40,.055);
+}
+
+.smallLabel {
+  margin-bottom: 7px;
+  color: #2857a4;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+}
+
+.welcomeCard h2 {
+  margin: 0 0 8px;
+  color: #142b4d;
+  font-size: 25px;
+}
+
+.welcomeCard p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.adminBadge {
+  min-width: 145px;
+  padding: 14px 18px;
+  text-align: center;
+  border-radius: 12px;
+  background: #edf3ff;
+  border: 1px solid #dce7fb;
+}
+
+.adminBadge span {
+  display: block;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .8px;
+}
+
+.adminBadge strong {
+  display: block;
+  margin-top: 4px;
+  color: #173b7a;
+  font-size: 17px;
+}
+
+/* DASHBOARD CARDS */
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 18px;
+  margin-top: 23px;
+}
+
+.dashboardCard {
+  position: relative;
+  min-height: 155px;
+  padding: 23px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e0e7f0;
+  border-radius: 16px;
+  box-shadow: 0 5px 18px rgba(16,24,40,.045);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.dashboardCard:hover {
+  transform: translateY(-4px);
+  border-color: #bfd0ea;
+  box-shadow: 0 13px 30px rgba(16,24,40,.10);
+}
+
+.dashboardIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 12px;
+  background: #edf3ff;
+  color: #173b7a;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.dashboardText h3 {
+  margin: 17px 0 5px;
+  color: #172b4d;
+  font-size: 16px;
+}
+
+.dashboardText p {
+  margin: 0;
+  max-width: 240px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cardArrow {
+  position: absolute;
+  right: 21px;
+  bottom: 20px;
+  color: #98a2b3;
+  font-size: 17px;
+}
+
+.dangerCard {
+  border-color: #eee0e0;
+}
+
+.dangerCard:hover {
+  border-color: #e5c5c5;
+}
+
+.dangerIcon {
+  background: #fff1f1 !important;
+  color: #a12828 !important;
+}
+
+/* OVERVIEW */
+
+.overviewSection {
+  margin-top: 25px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #e0e7f0;
+  border-radius: 16px;
+  box-shadow: 0 5px 18px rgba(16,24,40,.04);
+}
+
+.sectionTitle h3 {
+  margin: 0;
+  color: #172b4d;
+  font-size: 17px;
+}
+
+.sectionTitle p {
+  margin: 4px 0 18px;
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 14px;
+}
+
+.overviewCard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f7f9fc;
+  border: 1px solid #e8edf3;
+}
+
+.overviewIcon {
+  width: 39px;
+  height: 39px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  background: #eaf1ff;
+  color: #173b7a;
+}
+
+.overviewCard span {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+}
+
+.overviewCard strong {
+  display: block;
+  margin-top: 2px;
+  color: #173b7a;
+  font-size: 20px;
+}
+
+/* INNER PAGES */
+
+.backBtn {
+  margin-bottom: 18px;
+  background: transparent;
+  color: #173b7a;
+  padding-left: 0;
+}
+
+.backBtn:hover {
+  color: #102f63;
+}
+
+.contentCard {
+  padding: 27px;
+  background: #fff;
+  border: 1px solid #e0e7f0;
+  border-radius: 17px;
+  box-shadow: 0 6px 22px rgba(16,24,40,.05);
+}
+
+.narrowContent {
+  max-width: 850px;
+}
+
+.sectionHeader {
+  margin-bottom: 22px;
+}
+
+.sectionHeader h2 {
+  margin: 0 0 5px;
+  color: #172b4d;
+  font-size: 21px;
+}
+
+.sectionHeader p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+/* FORMS */
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 17px;
+}
+
+.passwordForm {
+  display: grid;
+  gap: 17px;
+  max-width: 520px;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: 180px 180px 1fr;
+  gap: 14px;
+  align-items: end;
+}
+
+.filterActions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.summaryRow {
+  display: flex;
+  gap: 15px;
+  margin: 22px 0;
+}
+
+.summaryRow > div {
+  min-width: 160px;
+  padding: 14px 17px;
+  border-radius: 11px;
+  background: #f6f8fb;
+  border: 1px solid #e6ebf2;
+}
+
+.summaryRow span {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+}
+
+.summaryRow strong {
+  display: block;
+  margin-top: 4px;
+  color: #173b7a;
+  font-size: 19px;
+}
+
+/* TABLE */
+
+.tableContainer {
+  width: 100%;
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid #e3e8ef;
+  border-radius: 11px;
+}
+
+table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+thead {
+  background: #f5f7fa;
+}
+
+th {
+  padding: 13px 14px;
+  text-align: left;
+  color: #344054;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+  border-bottom: 1px solid #e0e6ee;
+}
+
+td {
+  padding: 13px 14px;
+  color: #475467;
+  font-size: 12px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+tbody tr:hover {
+  background: #f9fbff;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.empty {
+  padding: 30px;
+  text-align: center;
+  color: #98a2b3;
+}
+
+.roleBadge {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #edf3ff;
+  color: #173b7a;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status.active {
+  background: #eaf7ef;
+  color: #207345;
+}
+
+.status.inactive {
+  background: #f3f4f6;
+  color: #667085;
+}
+
+/* ADMIN MANAGEMENT */
+
+.managementGrid {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 18px;
+}
+
+.managementCard {
+  padding: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+
+.managementIcon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 14px;
+  border-radius: 11px;
+  background: #edf3ff;
+  color: #173b7a;
+  font-weight: 800;
+}
+
+.managementCard h3 {
+  margin: 0 0 5px;
+  color: #172b4d;
+  font-size: 16px;
+}
+
+.managementCard p {
+  min-height: 36px;
+  margin: 0 0 16px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.managementCard select,
+.managementCard input {
+  margin-bottom: 10px;
+}
+
+.message {
+  margin: 17px 0 0;
+  padding: 11px 14px;
+  border-radius: 9px;
+  background: #eef4ff;
+  border: 1px solid #dce7fb;
+  color: #173b7a;
+  font-size: 12px;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 950px) {
+  .dashboardGrid {
+    grid-template-columns: repeat(2,1fr);
+  }
+
+  .filterGrid {
+    grid-template-columns: repeat(2,1fr);
+  }
+
+  .filterActions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    padding: 15px 20px;
+    flex-wrap: wrap;
+  }
+
+  .mainContent {
+    width: calc(100% - 28px);
+    padding-top: 20px;
+  }
+
+  .welcomeCard {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 22px;
+  }
+
+  .adminBadge {
+    width: 100%;
+  }
+
+  .dashboardGrid,
+  .managementGrid,
+  .overviewGrid,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewSection,
+  .contentCard {
+    padding: 19px;
+  }
+
+  .filterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filterActions {
+    grid-column: auto;
+  }
+
+  .summaryRow {
+    flex-direction: column;
+  }
+
+  .summaryRow > div {
+    width: 100%;
+  }
+}
+
+@media (max-width: 500px) {
+  .topRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .adminInfo {
+    align-items: flex-start;
+  }
+
+  .loginCard {
+    padding: 27px 22px;
+  }
+
+  .dashboardCard {
+    min-height: 140px;
+  }
+}
+`;
