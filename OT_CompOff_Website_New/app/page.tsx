@@ -48,6 +48,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const MAIN_ADMIN_ID = 'SAS102';
 const SESSION_KEY = 'ot_details_session';
+const LOGIN_BRAND_NAME_KEY = 'ot_login_brand_name';
+const LOGIN_BRAND_PHOTO_KEY = 'ot_login_brand_photo';
 
 const css = `
 * {
@@ -1138,6 +1140,15 @@ export default function Home() {
   const [profilePhotoSaving, setProfilePhotoSaving] =
     useState(false);
 
+  /* LOGIN PAGE BRANDING */
+
+  const [loginBrandName, setLoginBrandName] =
+    useState('Ajeet Sharma');
+  const [loginBrandPhoto, setLoginBrandPhoto] =
+    useState('');
+  const [loginBrandSaving, setLoginBrandSaving] =
+    useState(false);
+
   useEffect(() => {
     try {
       const saved =
@@ -1148,6 +1159,20 @@ export default function Home() {
       }
     } catch {
       localStorage.removeItem(SESSION_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const savedName =
+        localStorage.getItem(LOGIN_BRAND_NAME_KEY);
+      const savedPhoto =
+        localStorage.getItem(LOGIN_BRAND_PHOTO_KEY);
+
+      if (savedName) setLoginBrandName(savedName);
+      if (savedPhoto) setLoginBrandPhoto(savedPhoto);
+    } catch {
+      // Keep default login branding if local storage is unavailable.
     }
   }, []);
 
@@ -1189,6 +1214,92 @@ export default function Home() {
     params: Record<string, any>
   ) {
     return supabase.rpc(functionName, params);
+  }
+
+  /* LOGIN PAGE BRANDING */
+
+  async function handleLoginBrandPhoto(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setMessage('Please select an image file');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Image size must be 5 MB or less');
+      event.target.value = '';
+      return;
+    }
+
+    setLoginBrandSaving(true);
+    setMessage('');
+
+    try {
+      const reader = new FileReader();
+
+      const compressed = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const max = 300;
+            const scale = Math.min(1, max / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Unable to process image'));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.onerror = () => reject(new Error('Unable to read image'));
+          img.src = String(reader.result);
+        };
+        reader.onerror = () => reject(new Error('Unable to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      setLoginBrandPhoto(compressed);
+      localStorage.setItem(LOGIN_BRAND_PHOTO_KEY, compressed);
+      setMessage('Login page photo updated successfully');
+    } catch (error: any) {
+      setMessage(error?.message || 'Unable to update login page photo');
+    } finally {
+      setLoginBrandSaving(false);
+      event.target.value = '';
+    }
+  }
+
+  function saveLoginBranding() {
+    const name = loginBrandName.trim();
+    if (!name) {
+      setMessage('Please enter the owner name');
+      return;
+    }
+
+    try {
+      localStorage.setItem(LOGIN_BRAND_NAME_KEY, name);
+      localStorage.setItem(LOGIN_BRAND_PHOTO_KEY, loginBrandPhoto || '');
+      setLoginBrandName(name);
+      setMessage('Login page profile updated successfully');
+    } catch {
+      setMessage('Unable to save login page profile on this browser');
+    }
+  }
+
+  function resetLoginBranding() {
+    localStorage.removeItem(LOGIN_BRAND_NAME_KEY);
+    localStorage.removeItem(LOGIN_BRAND_PHOTO_KEY);
+    setLoginBrandName('Ajeet Sharma');
+    setLoginBrandPhoto('');
+    setMessage('Login page profile reset successfully');
   }
 
   /* LOGIN */
@@ -2289,26 +2400,32 @@ export default function Home() {
             <div className="login-brand">
               <div className="brand-logo">
                 <div className="brand-mark">
-                  OT
+                  A
                 </div>
 
                 <h1 className="brand-title">
-                  OT DETAILS
+                  AROVIA COLLECTIVE
                 </h1>
 
                 <p className="brand-subtitle">
-                  Centralized overtime and
-                  employee management portal
-                  for secure and efficient
-                  workforce operations.
+                  Building smarter workplaces for a stronger tomorrow.
+                  Technology-driven solutions for simpler and more efficient workforce operations.
                 </p>
               </div>
 
               <div className="brand-bottom">
-                <div className="brand-line" />
-
-                <div className="brand-small">
-                  Secure Management Portal
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', background: 'rgba(255,255,255,.14)', border: '2px solid rgba(255,255,255,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundImage: loginBrandPhoto ? `url(${loginBrandPhoto})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                    {!loginBrandPhoto && (loginBrandName || 'A').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                      {loginBrandName || 'Ajeet Sharma'}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: '#cbd9ef', fontWeight: 700 }}>
+                      Owner
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3801,6 +3918,66 @@ export default function Home() {
                       Reset Password
                     </button>
 
+                  </div>
+
+                  <div className="panel" style={{ gridColumn: '1 / -1' }}>
+                    <div className="panel-header">
+                      <div>
+                        <div className="panel-title">
+                          Login Page Profile
+                        </div>
+                        <div className="helper">
+                          Set the name and photo shown at the bottom-left of the Staff/Admin login screen.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
+                      <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', background: '#eaf1ff', color: '#1455b8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 800, border: '3px solid #d8e5ff', backgroundImage: loginBrandPhoto ? `url(${loginBrandPhoto})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {!loginBrandPhoto && (loginBrandName || 'A').charAt(0).toUpperCase()}
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 240 }}>
+                        <div className="form-group">
+                          <label className="form-label">Owner Name</label>
+                          <input
+                            className="form-input"
+                            value={loginBrandName}
+                            onChange={(e) => setLoginBrandName(e.target.value)}
+                            placeholder="Enter owner name"
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Owner Photo</label>
+                          <input
+                            className="form-input"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLoginBrandPhoto}
+                            disabled={loginBrandSaving}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <button
+                            className="action-btn"
+                            onClick={saveLoginBranding}
+                            disabled={loginBrandSaving}
+                          >
+                            {loginBrandSaving ? 'Saving...' : 'Save Login Profile'}
+                          </button>
+
+                          <button
+                            className="danger-btn"
+                            onClick={resetLoginBranding}
+                            disabled={loginBrandSaving}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                 </div>
