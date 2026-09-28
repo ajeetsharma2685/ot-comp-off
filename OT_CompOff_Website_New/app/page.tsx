@@ -2565,6 +2565,15 @@ export default function Home() {
                         <input className="form-input" type="date" value={staffOTDate} onChange={(e) => setStaffOTDate(e.target.value)} />
                       </div>
                       <div className="form-group">
+                        <label className="form-label">Day</label>
+                        <input
+                          className="form-input"
+                          value={getDayName(staffOTDate)}
+                          readOnly
+                          placeholder="Select OT date"
+                        />
+                      </div>
+                      <div className="form-group">
                         <label className="form-label">OT Hours</label>
                         <input className="form-input" value={calculateHours(staffOTStart, staffOTEnd).toFixed(2)} readOnly />
                       </div>
@@ -2607,7 +2616,7 @@ export default function Home() {
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead><tr>
-                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>Day</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Actions</th>
+                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th style={{ minWidth: 95, whiteSpace: 'nowrap' }}>Day</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Actions</th>
                         </tr></thead>
                         <tbody>
                           {staffOTRecords.map((r, i) => (
@@ -2616,7 +2625,7 @@ export default function Home() {
                               <td>{r.start_time || '-'}</td>
                               <td>{r.end_time || '-'}</td>
                               <td>{Number(r.ot_hours || 0).toFixed(2)}</td>
-                              <td>{getDayName(r.ot_date)}</td>
+                              <td style={{ minWidth: 95, whiteSpace: 'nowrap', fontWeight: 700 }}>{getDayName(r.ot_date)}</td>
                               <td>{r.reason || '-'}</td>
                               <td>{r.comp_off_date ? <span className="comp-off-date">{r.comp_off_date}</span> : '-'}</td>
                               <td>{r.comp_off_date ? <span className="badge badge-active">Comp-Off Taken</span> : <span className="badge badge-off">Pending</span>}</td>
@@ -2685,6 +2694,64 @@ export default function Home() {
 
           </div>
         </div>
+
+        {/* STAFF COMP-OFF MODAL */}
+        {compOffRow && (
+          <div
+            className="modal-overlay"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setCompOffRow(null);
+                setCompOffDate('');
+              }
+            }}
+          >
+            <div className="modal-box" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="panel-header">
+                <div>
+                  <div className="panel-title">
+                    {compOffRow.comp_off_date ? 'Change Comp-Off' : 'Add Comp-Off'}
+                  </div>
+                  <div className="helper">
+                    {session.employee_id} - {session.name}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Comp-Off Date</label>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={compOffDate}
+                  onChange={(e) => setCompOffDate(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => {
+                    setCompOffRow(null);
+                    setCompOffDate('');
+                  }}
+                  disabled={savingCompOff}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={saveCompOff}
+                  disabled={savingCompOff || !compOffDate}
+                >
+                  {savingCompOff ? 'Saving...' : 'Save Comp-Off'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -3256,7 +3323,7 @@ export default function Home() {
                             Hours
                           </th>
 
-                          <th>
+                          <th style={{ minWidth: 95, whiteSpace: 'nowrap' }}>
                             Day
                           </th>
 
@@ -3322,7 +3389,7 @@ export default function Home() {
                                 )}
                               </td>
 
-                              <td>
+                              <td style={{ minWidth: 95, whiteSpace: 'nowrap', fontWeight: 700 }}>
                                 {getDayName(r.ot_date)}
                               </td>
 
