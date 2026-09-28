@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'OT DETAILS',
-  description: 'OT Details Management Portal',
+  title: 'AROVIA COLLECTIVE',
+  description: 'AROVIA COLLECTIVE',
 };
 
 export default function RootLayout({
