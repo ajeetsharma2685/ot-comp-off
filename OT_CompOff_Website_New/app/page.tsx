@@ -1073,6 +1073,7 @@ export default function Home() {
     useState<Page>('dashboard');
 
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [staffDirectory, setStaffDirectory] = useState<Staff[]>([]);
   const [admins, setAdmins] = useState<Staff[]>([]);
   const [otRecords, setOtRecords] =
     useState<OTEntry[]>([]);
@@ -1340,15 +1341,18 @@ export default function Home() {
 
   function normalizeOTRow(row: any, staffList: Staff[]): OTEntry {
     const person = resolveStaffPerson(row, staffList);
+    const employeeId = String(row?.employee_id || '').trim() || person?.employee_id || '';
+    const name = String(row?.name || '').trim() || person?.name || '';
+    const reason = String(row?.reason || row?.ot_reason || '').trim();
 
     return {
       ...row,
       staff_id: row.staff_id ?? person?.id,
-      employee_id: row.employee_id ?? person?.employee_id ?? '',
-      name: row.name ?? person?.name ?? '',
-      reason: row.reason ?? row.ot_reason ?? '',
-      comp_off_date: row.comp_off_date ?? null,
-      comp_off_status: row.comp_off_date ? 'Taken' : (row.comp_off_status ?? null),
+      employee_id: employeeId,
+      name,
+      reason,
+      comp_off_date: row.comp_off_date || null,
+      comp_off_status: row.comp_off_date ? 'Taken' : (row.comp_off_status || null),
     };
   }
 
@@ -1376,8 +1380,9 @@ export default function Home() {
           x.role !== 'admin'
       );
 
+      setStaffDirectory(data.staff || []);
       setStaff(activeStaff);
-      return activeStaff;
+      return data.staff || [];
     }
 
     setStaff([]);
@@ -1396,7 +1401,7 @@ export default function Home() {
     }
   }
 
-  async function loadOT(staffList: Staff[] = staff) {
+  async function loadOT(staffList: Staff[] = staffDirectory) {
     if (!session?.employee_id) return;
 
     const { data: rpcData, error: rpcError } =
