@@ -705,6 +705,9 @@ button {
 }
 
 .comp-off-btn {
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
   height: 36px;
   padding: 0 13px;
   border: 0;
@@ -1340,25 +1343,67 @@ export default function Home() {
   }
 
   async function loadOT() {
+    /*
+     * First use the admin RPC. If the RPC returns no rows, fall back to the
+     * actual ot_entries table so OT entries created from the Staff portal are
+     * also visible in Admin. Staff names/employee IDs are resolved from the
+     * staff list already loaded above.
+     */
     const { data, error } =
       await adminRPC('admin_get_all_ot', {
         p_admin_employee_id:
           session.employee_id,
       });
 
-    if (!error && data?.success) {
-      const records =
-        data.records ||
-        data.ot_records ||
-        [];
+    const rpcRecords =
+      !error && data?.success
+        ? data.records || data.ot_records || []
+        : [];
 
+    if (rpcRecords.length > 0) {
       setOtRecords(
-        records.map((r: any) => ({
+        rpcRecords.map((r: any) => ({
           ...r,
           reason: r.reason ?? r.ot_reason ?? '',
         }))
       );
+      return;
     }
+
+    const { data: directRows, error: directError } =
+      await supabase
+        .from('ot_entries')
+        .select('*')
+        .order('ot_date', { ascending: false })
+        .order('id', { ascending: false });
+
+    if (directError) {
+      if (error) setMessage(error.message);
+      else setMessage(directError.message);
+      return;
+    }
+
+    const staffMap = new Map(
+      (staff || []).map((person: Staff) => [
+        String(person.id),
+        person,
+      ])
+    );
+
+    const records = (directRows || []).map((r: any) => {
+      const person = staffMap.get(String(r.staff_id));
+
+      return {
+        ...r,
+        employee_id:
+          r.employee_id ?? person?.employee_id ?? '',
+        name:
+          r.name ?? person?.name ?? '',
+        reason: r.reason ?? r.ot_reason ?? '',
+      };
+    });
+
+    setOtRecords(records);
   }
 
   /* STAFF OT */
@@ -1642,6 +1687,51 @@ export default function Home() {
       }
     } finally {
       setSavingCompOff(false);
+    }
+  }
+
+  /* DELETE OT */
+
+  async function deleteOTEntry(row: OTEntry) {
+    if (!row.id) {
+      setMessage('OT record ID not found');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete this OT entry${row.ot_date ? ` (${row.ot_date})` : ''}?\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setMessage('');
+
+    try {
+      let query = supabase
+        .from('ot_entries')
+        .delete()
+        .eq('id', row.id);
+
+      if (session?.role === 'staff' && session?.id) {
+        query = query.eq('staff_id', session.id);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      setMessage('OT entry deleted successfully');
+
+      if (session?.role === 'admin') {
+        await loadOT();
+      } else {
+        await loadStaffOT();
+      }
+    } catch (error: any) {
+      setMessage(error?.message || 'Unable to delete OT entry');
     }
   }
 
@@ -2449,7 +2539,7 @@ export default function Home() {
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead><tr>
-                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Comp-Off</th>
+                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Comp-Off</th><th>Delete</th>
                         </tr></thead>
                         <tbody>
                           {staffOTRecords.map((r, i) => (
@@ -2460,7 +2550,7 @@ export default function Home() {
                               <td>{Number(r.ot_hours || 0).toFixed(2)}</td>
                               <td>{r.reason || '-'}</td>
                               <td>{r.comp_off_date ? <span className="comp-off-date">{r.comp_off_date}</span> : '-'}</td>
-                              <td>{r.comp_off_date ? <span className="badge badge-active">Taken</span> : <span className="badge badge-off">Pending</span>}</td>
+                              <td>{r.comp_off_date ? <span className="badge badge-active">Comp-Off Taken</span> : <span className="badge badge-off">Pending</span>}</td>
                               <td>
                                 <button className="comp-off-btn" onClick={() => {
                                   setCompOffRow({ ...r, employee_id: session.employee_id, name: session.name });
@@ -2470,10 +2560,19 @@ export default function Home() {
                                   {r.comp_off_date ? 'Change' : 'Comp-Off'}
                                 </button>
                               </td>
+                              <td>
+                                <button
+                                  className="secondary-btn"
+                                  onClick={() => deleteOTEntry(r)}
+                                  style={{ color: '#c62828', borderColor: '#f0caca' }}
+                                >
+                                  Delete
+                                </button>
+                              </td>
                             </tr>
                           ))}
                           {!staffOTRecords.length && (
-                            <tr><td colSpan={8} style={{ textAlign: 'center', padding: 35, color: '#8a94a6' }}>No OT records found.</td></tr>
+                            <tr><td colSpan={9} style={{ textAlign: 'center', padding: 35, color: '#8a94a6' }}>No OT records found.</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -3099,6 +3198,10 @@ export default function Home() {
                           <th>
                             Comp-Off
                           </th>
+
+                          <th>
+                            Delete
+                          </th>
                         </tr>
                       </thead>
 
@@ -3178,6 +3281,16 @@ export default function Home() {
 
                               </td>
 
+                              <td>
+                                <button
+                                  className="secondary-btn"
+                                  onClick={() => deleteOTEntry(r)}
+                                  style={{ color: '#c62828', borderColor: '#f0caca' }}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+
                             </tr>
                           )
                         )}
@@ -3185,7 +3298,7 @@ export default function Home() {
                         {!filteredOT.length && (
                           <tr>
                             <td
-                              colSpan={9}
+                              colSpan={10}
                               style={{
                                 textAlign:
                                   'center',
