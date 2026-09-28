@@ -1173,6 +1173,9 @@ export default function Home() {
   }, [session?.employee_id]);
 
   useEffect(() => {
+    setCompOffRow(null);
+    setCompOffDate('');
+
     if (session?.role === 'admin') {
       loadDashboardData();
     } else if (session?.role === 'staff') {
@@ -1244,6 +1247,8 @@ export default function Home() {
           JSON.stringify(user)
         );
 
+        setCompOffRow(null);
+        setCompOffDate('');
         setSession(user);
         setEmployeeId('');
         setPassword('');
@@ -1282,6 +1287,8 @@ export default function Home() {
           JSON.stringify(staffUser)
         );
 
+        setCompOffRow(null);
+        setCompOffDate('');
         setSession(staffUser);
         setEmployeeId('');
         setPassword('');
@@ -1293,6 +1300,8 @@ export default function Home() {
 
   function logout() {
     localStorage.removeItem(SESSION_KEY);
+    setCompOffRow(null);
+    setCompOffDate('');
     setSession(null);
     setLoginMode('staff');
     setPage('dashboard');
@@ -1302,17 +1311,58 @@ export default function Home() {
     setPassword('');
   }
 
+  function getDayName(date?: string) {
+    if (!date) return '-';
+    const d = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+
+  function resolveStaffPerson(row: any, staffList: Staff[]) {
+    if (row?.staff_id != null) {
+      const byId = staffList.find(
+        (person) => String(person.id) === String(row.staff_id)
+      );
+      if (byId) return byId;
+    }
+
+    if (row?.employee_id) {
+      const byEmployeeId = staffList.find(
+        (person) =>
+          String(person.employee_id).trim().toLowerCase() ===
+          String(row.employee_id).trim().toLowerCase()
+      );
+      if (byEmployeeId) return byEmployeeId;
+    }
+
+    return undefined;
+  }
+
+  function normalizeOTRow(row: any, staffList: Staff[]): OTEntry {
+    const person = resolveStaffPerson(row, staffList);
+
+    return {
+      ...row,
+      staff_id: row.staff_id ?? person?.id,
+      employee_id: row.employee_id ?? person?.employee_id ?? '',
+      name: row.name ?? person?.name ?? '',
+      reason: row.reason ?? row.ot_reason ?? '',
+      comp_off_date: row.comp_off_date ?? null,
+      comp_off_status: row.comp_off_date ? 'Taken' : (row.comp_off_status ?? null),
+    };
+  }
+
   /* ADMIN DATA */
 
   async function loadDashboardData() {
     if (!session?.employee_id) return;
 
-    await loadStaff();
+    const loadedStaff = await loadStaff();
     await loadAdmins();
-    await loadOT();
+    await loadOT(loadedStaff);
   }
 
-  async function loadStaff() {
+  async function loadStaff(): Promise<Staff[]> {
     const { data, error } =
       await adminRPC('admin_get_staff', {
         p_admin_employee_id:
@@ -1327,7 +1377,11 @@ export default function Home() {
       );
 
       setStaff(activeStaff);
+      return activeStaff;
     }
+
+    setStaff([]);
+    return [];
   }
 
   async function loadAdmins() {
@@ -1342,33 +1396,18 @@ export default function Home() {
     }
   }
 
-  async function loadOT() {
-    /*
-     * First use the admin RPC. If the RPC returns no rows, fall back to the
-     * actual ot_entries table so OT entries created from the Staff portal are
-     * also visible in Admin. Staff names/employee IDs are resolved from the
-     * staff list already loaded above.
-     */
-    const { data, error } =
+  async function loadOT(staffList: Staff[] = staff) {
+    if (!session?.employee_id) return;
+
+    const { data: rpcData, error: rpcError } =
       await adminRPC('admin_get_all_ot', {
-        p_admin_employee_id:
-          session.employee_id,
+        p_admin_employee_id: session.employee_id,
       });
 
     const rpcRecords =
-      !error && data?.success
-        ? data.records || data.ot_records || []
+      !rpcError && rpcData?.success
+        ? rpcData.records || rpcData.ot_records || []
         : [];
-
-    if (rpcRecords.length > 0) {
-      setOtRecords(
-        rpcRecords.map((r: any) => ({
-          ...r,
-          reason: r.reason ?? r.ot_reason ?? '',
-        }))
-      );
-      return;
-    }
 
     const { data: directRows, error: directError } =
       await supabase
@@ -1377,33 +1416,33 @@ export default function Home() {
         .order('ot_date', { ascending: false })
         .order('id', { ascending: false });
 
-    if (directError) {
-      if (error) setMessage(error.message);
-      else setMessage(directError.message);
+    // Prefer the real table because it contains the exact current
+    // Comp-Off/Delete state. If RLS prevents direct reading, use the
+    // admin RPC instead.
+    if (!directError && Array.isArray(directRows)) {
+      setOtRecords(
+        directRows.map((row: any) =>
+          normalizeOTRow(row, staff)
+        )
+      );
       return;
     }
 
-    const staffMap = new Map(
-      (staff || []).map((person: Staff) => [
-        String(person.id),
-        person,
-      ])
+    if (rpcRecords.length > 0) {
+      setOtRecords(
+        rpcRecords.map((row: any) =>
+          normalizeOTRow(row, staff)
+        )
+      );
+      return;
+    }
+
+    setOtRecords([]);
+    setMessage(
+      directError?.message ||
+      rpcError?.message ||
+      'Unable to load OT records'
     );
-
-    const records = (directRows || []).map((r: any) => {
-      const person = staffMap.get(String(r.staff_id));
-
-      return {
-        ...r,
-        employee_id:
-          r.employee_id ?? person?.employee_id ?? '',
-        name:
-          r.name ?? person?.name ?? '',
-        reason: r.reason ?? r.ot_reason ?? '',
-      };
-    });
-
-    setOtRecords(records);
   }
 
   /* STAFF OT */
@@ -1441,7 +1480,19 @@ export default function Home() {
       return;
     }
 
-    setStaffOTRecords(data || []);
+    setStaffOTRecords(
+      (data || []).map((row: any) =>
+        normalizeOTRow(row, [
+          {
+            id: session.id,
+            employee_id: session.employee_id,
+            name: session.name,
+            access_enabled: true,
+            role: 'staff',
+          },
+        ])
+      )
+    );
   }
 
   async function saveStaffOT() {
@@ -1676,15 +1727,13 @@ export default function Home() {
       setCompOffRow(null);
       setCompOffDate('');
 
-      setMessage(
-        'Comp-Off date saved successfully'
-      );
-
       if (session?.role === 'admin') {
         await loadOT();
       } else {
         await loadStaffOT();
       }
+
+      setMessage('Comp-Off saved — Status: Comp-Off Taken');
     } finally {
       setSavingCompOff(false);
     }
@@ -1719,19 +1768,31 @@ export default function Home() {
       const { error } = await query;
 
       if (error) {
-        setMessage(error.message);
+        setMessage(
+          `Delete failed: ${error.message}`
+        );
         return;
       }
 
-      setMessage('OT entry deleted successfully');
-
+      // Remove immediately from the visible list so the deleted row
+      // disappears without waiting for another page refresh.
       if (session?.role === 'admin') {
+        setOtRecords((current) =>
+          current.filter((item) => item.id !== row.id)
+        );
         await loadOT();
       } else {
+        setStaffOTRecords((current) =>
+          current.filter((item) => item.id !== row.id)
+        );
         await loadStaffOT();
       }
+
+      setMessage('OT entry deleted successfully');
     } catch (error: any) {
-      setMessage(error?.message || 'Unable to delete OT entry');
+      setMessage(
+        error?.message || 'Unable to delete OT entry'
+      );
     }
   }
 
@@ -2145,6 +2206,7 @@ export default function Home() {
       'Start Time',
       'End Time',
       'OT Hours',
+      'Day',
       'OT Reason',
       'Status',
       'Comp-Off Date',
@@ -2157,10 +2219,11 @@ export default function Home() {
       r.start_time || '',
       r.end_time || '',
       r.ot_hours || '',
+      getDayName(r.ot_date),
       r.reason || '',
       r.comp_off_date
-        ? 'Taken'
-        : '',
+        ? 'Comp-Off Taken'
+        : 'Pending',
       r.comp_off_date || '',
     ]);
 
@@ -2539,7 +2602,7 @@ export default function Home() {
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead><tr>
-                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Comp-Off</th><th>Delete</th>
+                          <th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>Day</th><th>OT Reason</th><th>Comp-Off Date</th><th>Status</th><th>Actions</th>
                         </tr></thead>
                         <tbody>
                           {staffOTRecords.map((r, i) => (
@@ -2548,26 +2611,27 @@ export default function Home() {
                               <td>{r.start_time || '-'}</td>
                               <td>{r.end_time || '-'}</td>
                               <td>{Number(r.ot_hours || 0).toFixed(2)}</td>
+                              <td>{getDayName(r.ot_date)}</td>
                               <td>{r.reason || '-'}</td>
                               <td>{r.comp_off_date ? <span className="comp-off-date">{r.comp_off_date}</span> : '-'}</td>
                               <td>{r.comp_off_date ? <span className="badge badge-active">Comp-Off Taken</span> : <span className="badge badge-off">Pending</span>}</td>
                               <td>
-                                <button className="comp-off-btn" onClick={() => {
-                                  setCompOffRow({ ...r, employee_id: session.employee_id, name: session.name });
-                                  setCompOffDate(r.comp_off_date || '');
-                                  setMessage('');
-                                }}>
-                                  {r.comp_off_date ? 'Change' : 'Comp-Off'}
-                                </button>
-                              </td>
-                              <td>
-                                <button
-                                  className="secondary-btn"
-                                  onClick={() => deleteOTEntry(r)}
-                                  style={{ color: '#c62828', borderColor: '#f0caca' }}
-                                >
-                                  Delete
-                                </button>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <button className="comp-off-btn" onClick={() => {
+                                    setCompOffRow({ ...r, employee_id: session.employee_id, name: session.name });
+                                    setCompOffDate(r.comp_off_date || '');
+                                    setMessage('');
+                                  }}>
+                                    {r.comp_off_date ? 'Change' : 'Comp-Off'}
+                                  </button>
+                                  <button
+                                    className="secondary-btn"
+                                    onClick={() => deleteOTEntry(r)}
+                                    style={{ color: '#c62828', borderColor: '#f0caca' }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -3188,7 +3252,15 @@ export default function Home() {
                           </th>
 
                           <th>
+                            Day
+                          </th>
+
+                          <th>
                             OT Reason
+                          </th>
+
+                          <th>
+                            Comp-Off Date
                           </th>
 
                           <th>
@@ -3196,11 +3268,7 @@ export default function Home() {
                           </th>
 
                           <th>
-                            Comp-Off
-                          </th>
-
-                          <th>
-                            Delete
+                            Actions
                           </th>
                         </tr>
                       </thead>
@@ -3250,14 +3318,22 @@ export default function Home() {
                               </td>
 
                               <td>
+                                {getDayName(r.ot_date)}
+                              </td>
+
+                              <td>
                                 {r.reason ||
                                   '-'}
                               </td>
 
                               <td>
+                                {r.comp_off_date || '-'}
+                              </td>
+
+                              <td>
                                 {r.comp_off_date ? (
                                   <span className="badge badge-active">
-                                    Taken
+                                    Comp-Off Taken
                                   </span>
                                 ) : (
                                   <span className="badge badge-off">
@@ -3267,28 +3343,26 @@ export default function Home() {
                               </td>
 
                               <td>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <button
+                                    className="comp-off-btn"
+                                    onClick={() => {
+                                      setCompOffRow(r);
+                                      setCompOffDate(r.comp_off_date || '');
+                                      setMessage('');
+                                    }}
+                                  >
+                                    {r.comp_off_date ? 'Change' : 'Comp-Off'}
+                                  </button>
 
-                                <button
-                                  className="comp-off-btn"
-                                  onClick={() => {
-                                    setCompOffRow(r);
-                                    setCompOffDate(r.comp_off_date || '');
-                                    setMessage('');
-                                  }}
-                                >
-                                  {r.comp_off_date ? 'Change' : 'Comp-Off'}
-                                </button>
-
-                              </td>
-
-                              <td>
-                                <button
-                                  className="secondary-btn"
-                                  onClick={() => deleteOTEntry(r)}
-                                  style={{ color: '#c62828', borderColor: '#f0caca' }}
-                                >
-                                  Delete
-                                </button>
+                                  <button
+                                    className="secondary-btn"
+                                    onClick={() => deleteOTEntry(r)}
+                                    style={{ color: '#c62828', borderColor: '#f0caca' }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
 
                             </tr>
@@ -3298,7 +3372,7 @@ export default function Home() {
                         {!filteredOT.length && (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               style={{
                                 textAlign:
                                   'center',
