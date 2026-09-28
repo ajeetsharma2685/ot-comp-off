@@ -159,9 +159,10 @@ button {
 }
 
 .brand-title {
-  font-size: 42px;
+  font-size: 38px;
   font-weight: 800;
-  letter-spacing: -1.5px;
+  letter-spacing: -1.8px;
+  white-space: nowrap;
   margin: 0;
 }
 
