@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.aroviacollective",
+    "sha256_cert_fingerprints": ["6E:2C:6F:DD:A6:04:E0:59:9F:4F:BC:1B:8A:09:82:60:1C:2C:F0:15:6B:BF:CC:08:A5:B6:B4:DC:21:78:0D:DF"]
+  }
+}]
