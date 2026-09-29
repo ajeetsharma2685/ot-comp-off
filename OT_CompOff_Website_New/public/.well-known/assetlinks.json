@@ -2,9 +2,9 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "app.vercel.aroviacollective_ct5a4irky_ajeet_sharma.twa",
+    "package_name": "com.aroviacollective",
     "sha256_cert_fingerprints": [
-      "C1:9B:8F:DC:F3:F5:80:2A:32:12:6A:92:29:5A:6F:C9:B1:45:0F:59:A4:09:80:22:85:45:C1:33:31:3C:09:42"
+      "B9:3A:03:31:33:0C:0A:AC:6F:83:AC:79:8D:E9:88:0B:FC:99:BD:FC:F5:F6:10:B5:28:B0:35:87:A9:0C:EE:BB"
     ]
   }
 }]
