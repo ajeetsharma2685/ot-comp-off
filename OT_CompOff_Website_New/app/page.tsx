@@ -159,10 +159,9 @@ button {
 }
 
 .brand-title {
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
-  letter-spacing: -1.8px;
-  white-space: nowrap;
+  letter-spacing: -1.5px;
   margin: 0;
 }
 
@@ -1432,20 +1431,36 @@ export default function Home() {
   }
 
   function resolveStaffPerson(row: any, staffList: Staff[]) {
-    if (row?.staff_id != null) {
+    const rowStaffId = row?.staff_id ?? row?.staffId ?? row?.staff?.id;
+    const rowEmployeeId = row?.employee_id ?? row?.employeeId ?? row?.staff_employee_id ?? row?.staff?.employee_id;
+    const rowName = row?.name ?? row?.staff_name ?? row?.employee_name ?? row?.staff?.name;
+
+    // Match by database staff primary key first.
+    if (rowStaffId != null && Array.isArray(staffList)) {
       const byId = staffList.find(
-        (person) => String(person.id) === String(row.staff_id)
+        (person) => String(person?.id ?? '').trim() === String(rowStaffId).trim()
       );
       if (byId) return byId;
     }
 
-    if (row?.employee_id) {
+    // Then match by Employee ID. This also handles RPCs that already return employee_id.
+    if (rowEmployeeId && Array.isArray(staffList)) {
+      const target = String(rowEmployeeId).trim().toLowerCase();
       const byEmployeeId = staffList.find(
-        (person) =>
-          String(person.employee_id).trim().toLowerCase() ===
-          String(row.employee_id).trim().toLowerCase()
+        (person) => String(person?.employee_id ?? '').trim().toLowerCase() === target
       );
       if (byEmployeeId) return byEmployeeId;
+    }
+
+    // If the OT RPC itself supplied a name/employee id, keep those values as a fallback.
+    if (rowEmployeeId || rowName) {
+      return {
+        id: rowStaffId != null ? Number(rowStaffId) : undefined,
+        employee_id: rowEmployeeId ? String(rowEmployeeId).trim() : '',
+        name: rowName ? String(rowName).trim() : '',
+        access_enabled: true,
+        role: 'staff',
+      } as Staff;
     }
 
     return undefined;
@@ -1453,18 +1468,35 @@ export default function Home() {
 
   function normalizeOTRow(row: any, staffList: Staff[]): OTEntry {
     const person = resolveStaffPerson(row, staffList);
-    const employeeId = String(row?.employee_id || '').trim() || person?.employee_id || '';
-    const name = String(row?.name || '').trim() || person?.name || '';
-    const reason = String(row?.reason || row?.ot_reason || '').trim();
+    const rawEmployeeId =
+      row?.employee_id ?? row?.employeeId ?? row?.staff_employee_id ?? '';
+    const rawName =
+      row?.name ?? row?.staff_name ?? row?.employee_name ?? '';
+
+    const employeeId =
+      String(rawEmployeeId || '').trim() ||
+      String(person?.employee_id || '').trim() ||
+      '';
+
+    const name =
+      String(rawName || '').trim() ||
+      String(person?.name || '').trim() ||
+      '';
+
+    const reason = String(
+      row?.reason ?? row?.ot_reason ?? ''
+    ).trim();
 
     return {
       ...row,
-      staff_id: row.staff_id ?? person?.id,
+      staff_id: row?.staff_id ?? row?.staffId ?? person?.id,
       employee_id: employeeId,
       name,
       reason,
-      comp_off_date: row.comp_off_date || null,
-      comp_off_status: row.comp_off_date ? 'Taken' : (row.comp_off_status || null),
+      comp_off_date: row?.comp_off_date || null,
+      comp_off_status: row?.comp_off_date
+        ? 'Taken'
+        : (row?.comp_off_status || null),
     };
   }
 
@@ -1523,8 +1555,31 @@ export default function Home() {
 
     const rpcRecords =
       !rpcError && rpcData?.success
-        ? rpcData.records || rpcData.ot_records || []
+        ? (Array.isArray(rpcData.records)
+            ? rpcData.records
+            : Array.isArray(rpcData.ot_records)
+              ? rpcData.ot_records
+              : [])
         : [];
+
+    // Always keep the staff directory available for mapping OT staff_id -> employee_id/name.
+    // The RPC result can have slightly different property names depending on the SQL version,
+    // so normalize the staff list before mapping OT rows.
+    const safeStaffList: Staff[] = Array.isArray(staffList)
+      ? staffList
+          .map((person: any) => ({
+            id: Number(person?.id ?? person?.staff_id),
+            employee_id: String(
+              person?.employee_id ?? person?.employeeId ?? ''
+            ).trim(),
+            name: String(
+              person?.name ?? person?.staff_name ?? person?.employee_name ?? ''
+            ).trim(),
+            access_enabled: person?.access_enabled !== false,
+            role: String(person?.role ?? 'staff'),
+          }))
+          .filter((person) => Number.isFinite(person.id))
+      : [];
 
     const { data: directRows, error: directError } =
       await supabase
@@ -1539,7 +1594,7 @@ export default function Home() {
     if (!directError && Array.isArray(directRows)) {
       setOtRecords(
         directRows.map((row: any) =>
-          normalizeOTRow(row, staff)
+          normalizeOTRow(row, safeStaffList)
         )
       );
       return;
@@ -1548,7 +1603,7 @@ export default function Home() {
     if (rpcRecords.length > 0) {
       setOtRecords(
         rpcRecords.map((row: any) =>
-          normalizeOTRow(row, staff)
+          normalizeOTRow(row, safeStaffList)
         )
       );
       return;
