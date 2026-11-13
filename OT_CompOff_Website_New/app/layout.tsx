@@ -1,9 +1,10 @@
+
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AROVIA',
-  description: 'AROVIA COLLECTIVE OT & Comp-Off Portal',
+  title: 'YOUR MONEY',
+  description: 'YOUR MONEY - Personal Money Tracker',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icons/icon-192.png',
