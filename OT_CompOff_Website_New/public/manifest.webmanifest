@@ -1,8 +1,9 @@
+
 {
   "id": "/",
-  "name": "AROVIA COLLECTIVE OT & Comp-Off Portal",
-  "short_name": "AROVIA",
-  "description": "AROVIA COLLECTIVE OT & Comp-Off Portal",
+  "name": "YOUR MONEY",
+  "short_name": "YOUR MONEY",
+  "description": "YOUR MONEY - Personal Money Tracker",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
